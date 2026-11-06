@@ -10,7 +10,7 @@ Retro atari salonu derlemesi. Windows için tek `.exe`, Android için `.apk`.
 
 | Oyun | Açıklama |
 |------|----------|
-| **Dövüş Arenası** | 7 dövüşçü (Daiki, Jax, Kaito, Titus, Kaan, Zeyna, Demir), özel ve süper hareketler, kombolar, 6 arena. 1P (bilgisayara karşı) veya 2P |
+| **Dövüş Arenası** | 4 dövüşçü (Daiki, Jax, Kaito, Titus), özel ve süper hareketler, kombolar, 3 arena (Ejder Kalesi, Neon Çatı, Gece Metrosu). 1P (bilgisayara karşı) veya 2P |
 | **Neon Yılan** | Klasik yılan oyunu, altın elmalar |
 | **Tuğla Kırıcı** | Seviyeler ve güçlendirmeler (geniş raket, çoklu top, ekstra can) |
 | **Uzay İstilası** | Dalga dalga gelen uzaylılar, kalkanlar, bonus ana gemi |
@@ -24,7 +24,7 @@ Retro atari salonu derlemesi. Windows için tek `.exe`, Android için `.apk`.
 | Yumruk | F | K (veya Numpad 1) |
 | Tekme | G | L (veya Numpad 2) |
 
-Tek oyunculu modda iki tuş takımı da 1. oyuncuyu kontrol eder. Gamepad de desteklenir.
+Tek oyunculu modda iki tuş takımı da çalışır: **yön tuşları + K (yumruk) / L (tekme)** ya da **WASD + F / G**. Ekrandaki tuş göstergeleri gerçek klavye tuşlarını gösterir. Gamepad de desteklenir.
 
 - **Blok:** Geri yöne bas. Alçak saldırılara karşı **↓ + geri** bas.
 - **ESC:** Duraklatma menüsünü açar. Menüde tüm karakterlerin **hareket listesi** var.
@@ -37,26 +37,32 @@ Bilgisayarda da dokunmatik ekran varsa **Ayarlar → Dokunmatik Kontroller → A
 
 ### Özel hareketler (karakter sağa bakarken)
 
-**KAAN (Anadolu Ateşi):** dengeli dövüşçü
-- Ateş Topu: ↓ ↘ → + Yumruk
-- Kartal Yumruğu: → ↓ ↘ + Yumruk
-- Kasırga Tekmesi: ↓ ↙ ← + Tekme
-- **SÜPER: Alev Fırtınası:** ↓ ↘ → ↓ ↘ → + Yumruk
+**DAİKİ (Dövüş Ustası):** Geleneksel dövüş ustası. Ki dalgası ve ejder yükselişiyle dengeli.
+- Ki Dalgası: ↓ ↘ → + K (Yumruk)
+- Ejder Yükselişi: → ↓ ↘ + K (Yumruk)
+- Kasırga Tekmesi: ↓ ↙ ← + L (Tekme)
+- **SÜPER: Ejder Fırtınası:** ↓ ↘ → ↓ ↘ → + K (Yumruk)
 
-**ZEYNA (Rüzgârın Kızı):** hızlı, hava hâkimi
-- Rüzgâr Hançeri: ↓ ↘ → + Yumruk
-- Şimşek Tekmesi: ↓ ↘ → + Tekme
-- Ay Takla Tekmesi: → ↓ ↘ + Tekme
-- **SÜPER: Fırtına Dansı:** ↓ ↘ → ↓ ↘ → + Tekme
+**JAX (Sokak Kurdu):** Hızlı ve çevik. Kısa sürede uzun kombolar kurar.
+- Neon Bıçağı: ↓ ↘ → + K (Yumruk)
+- Uçan Diz: → ↓ ↘ + L (Tekme)
+- Şimşek Hücumu: ↓ ↘ → + L (Tekme)
+- **SÜPER: Neon Kasırgası:** ↓ ↘ → ↓ ↘ → + L (Tekme)
 
-**DEMİR (Dağların Pehlivanı):** yavaş ama çok güçlü
-- Deprem (yerden giden şok dalgası): ↓ ↘ → + Yumruk
-- Boğa Hücumu: ↓ ↙ ← + Yumruk
-- Gök Gürültüsü (zıplayıp yere çakılma): → ↓ ↘ + Tekme
-- **SÜPER: Dağ Devrilmesi:** ↓ ↘ → ↓ ↘ → + Yumruk
+**KAİTO (Gümüş Saçlı Meydan Okuyan):** Kendinden emin, uzak mesafe ustası. Ateşle oynar.
+- Gümüş Alev: ↓ ↘ → + K (Yumruk)
+- Ay Kesiği: → ↓ ↘ + L (Tekme)
+- Hayalet Adım: ↓ ↙ ← + L (Tekme)
+- **SÜPER: Kızıl Ay:** ↓ ↘ → ↓ ↘ → + K (Yumruk)
+
+**TİTUS (Demir Yumruk):** Ağır sıklet. Yavaş ama her darbesi yer sarsar.
+- Yer Sarsıntısı: ↓ ↘ → + K (Yumruk)
+- Buldozer: ↓ ↙ ← + K (Yumruk)
+- Gök Çekici: → ↓ ↘ + L (Tekme)
+- **SÜPER: Dağ Devrilmesi:** ↓ ↘ → ↓ ↘ → + K (Yumruk)
 
 ### Kombolar
-- **Ustalık kombosu:** Yumruk → Yumruk → Tekme → Tekme → özel hareket → Süper
+- **Ustalık kombosu:** K → K → L → L → özel hareket → Süper
 - **Zincir:** Yumruk → Yumruk → Tekme (3 vuruş, yere serer)
 - **Alçak zincir:** ↓+Yumruk → ↓+Yumruk → ↓+Tekme (süpürme)
 - **İptal kombosu:** Yumruk → Yumruk → hemen bir özel hareket komutu
@@ -70,7 +76,7 @@ Süper barı vurdukça ve vuruş yedikçe dolar. Her dolu bölüm bir süper har
 - **Daiki, Jax, Kaito, Titus** karakter çizimleri ve **Ejder Kalesi, Neon Çatı, Gece Metrosu** arka planları:
   [StreetFighter2D-Game](https://github.com/sujalvk888/StreetFighter2D-Game), Sujal V Kanchan, **MIT lisansı**.
   Lisans metni: `assets/LICENSE-StreetFighter2D-Game.txt`. Dönüştürme aracı: `tools/import_repo_assets.py`
-- **Kaan, Zeyna, Demir**, Boğaz / Kapadokya / Gece Çarşısı arenaları, mini oyunlar, müzik ve sesler bu projeye özgüdür ve kodla üretilir.
+- Mini oyunlar, müzik ve sesler bu projeye özgüdür ve kodla üretilir.
 - Yazı tipi: DejaVu Sans (serbest lisans, `assets/fonts/LICENSE-DejaVu.txt`).
 
 ## Çalıştırma (kaynak koddan)

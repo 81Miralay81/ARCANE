@@ -7,7 +7,7 @@ import pygame
 from engine.core import (BLACK, CYAN, GOLD, RED, WHITE, W, H, Particles, Scene, blit_glow, font, is_back, is_confirm,
                          lerp_color, nav_dir, shade, text, vgradient)
 from games.fighter.characters import CHARACTERS, MOTION_TEXT
-from games.fighter.controls import KEYMAP_SOLO, KEYMAPS, CPUController, HumanController
+from games.fighter.controls import KEYMAP_SOLO, KEYMAPS, CPUController, HumanController, key_names
 from games.fighter.fighter import GROUND, MAX_METER, SUPER_COST, Fighter, InputState
 from games.fighter.skeleton import POSES, blend, draw_fighter
 from games.fighter import sprites
@@ -211,7 +211,8 @@ class FighterSelect(Scene):
                 pygame.draw.rect(s, (40, 30, 60), (bx, y - 8, 200, 16), border_radius=8)
                 pygame.draw.rect(s, ch["fx"], (bx, y - 8, int(200 * min(1, v)), 16), border_radius=8)
             # özel hareketler
-            btn = {"P": "Yumruk", "K": "Tekme"}
+            kn = key_names(self.two, p)
+            btn = {"P": kn["P"], "K": kn["K"]}
             rows = [(sp["name"], MOTION_TEXT[sp["motion"]] + " + " + btn[sp["button"]]) for sp in ch["specials"]]
             rows.append(("SÜPER: " + ch["super"]["name"], MOTION_TEXT[ch["super"]["motion"]] + " + " + btn[ch["super"]["button"]]))
             for j, (nm, cmd) in enumerate(rows):
@@ -943,14 +944,14 @@ class FightScene(Scene):
         if self.two or self.touch is not None:
             ctrl = ""
         else:
-            ctrl = "ESC: Duraklat / Hareket Listesi   •   TAB: Özel hareketleri göster/gizle"
+            ctrl = "Yön: ← ↑ → ↓ (veya W A S D)   •   Yumruk: K (veya F)   •   Tekme: L (veya G)   •   ESC: Menü   •   TAB: Hareketler"
         text(s, ctrl, 16, (W // 2, H - 18), (220, 210, 240))
 
     MIRROR = str.maketrans("→←↘↙↗↖", "←→↙↘↖↗")
 
     def draw_skill_panel(self, s, f, i):
         """Ekranda özel hareketler ve komutları (karakterin baktığı yöne göre)."""
-        btn = {"P": "Y", "K": "T"}
+        btn = key_names(self.two, i)
         rows = [(sp["name"], MOTION_TEXT[sp["motion"]], btn[sp["button"]], False) for sp in f.ch["specials"]]
         sup = f.ch["super"]
         rows.append((sup["name"], MOTION_TEXT[sup["motion"]], btn[sup["button"]], True))
@@ -969,7 +970,7 @@ class FightScene(Scene):
             text(s, cmd.replace(" ", "") + " +" + b, 17, (x + 10, cy), CYAN if ready else (90, 100, 130),
                  anchor="midleft", shadow=False)
             text(s, name, 17, (x + pw - 10, cy), col, anchor="midright", shadow=False)
-        text(s, "Y = Yumruk  T = Tekme   (TAB: gizle)", 13, (x + pw // 2, y - 9), (170, 160, 200), shadow=False)
+        text(s, f"{btn['P']} = Yumruk   {btn['K']} = Tekme   (TAB: gizle)", 14, (x + pw // 2, y - 9), (190, 180, 220), shadow=False)
 
     def draw_announcer(self, s):
         t = self.phase_t
@@ -1045,9 +1046,11 @@ class FightScene(Scene):
 
     def draw_move_list(self, s):
         text(s, "HAREKET LİSTESİ", 50, (W // 2, 50), GOLD, outline=3)
-        text(s, "Komutlar karakter sağa bakarken yazılmıştır. Sola bakarken yönleri ters çevir.", 18, (W // 2, 92),
+        text(s, "Tuşlar: yön ← ↑ → ↓ (veya WASD) • Yumruk K (veya F) • Tekme L (veya G) • Komutlar sağa bakarken yazılmıştır", 17, (W // 2, 92),
              (200, 190, 230))
-        btn = {"P": "YUMRUK", "K": "TEKME"}
+        kn = key_names(self.two, 0)
+        btn = {"P": f"{kn['P']} (Yumruk)", "K": f"{kn['K']} (Tekme)"}
+        Y, T = kn["P"], kn["K"]
         for i, f in enumerate(self.f):
             if i == 1 and self.f[0].ch is self.f[1].ch:
                 continue
@@ -1066,12 +1069,12 @@ class FightScene(Scene):
         y = 380
         text(s, "KOMBOLAR", 30, (90, y), GOLD, anchor="midleft", outline=2)
         combos = [
-            ("Ustalık Kombosu", "YUMRUK → YUMRUK → TEKME → TEKME → özel hareket → SÜPER"),
-            ("Zincir Kombo", "YUMRUK → YUMRUK → TEKME  (3 vuruş, yere serer)"),
-            ("Alçak Zincir", "↓+YUMRUK → ↓+YUMRUK → ↓+TEKME  (süpürme, yere serer)"),
-            ("İptal Kombo", "YUMRUK → YUMRUK → hemen özel hareket komutu"),
+            ("Ustalık Kombosu", f"{Y} → {Y} → {T} → {T} → özel hareket → SÜPER"),
+            ("Zincir Kombo", f"{Y} → {Y} → {T}  (3 vuruş, yere serer)"),
+            ("Alçak Zincir", f"↓+{Y} → ↓+{Y} → ↓+{T}  (süpürme, yere serer)"),
+            ("İptal Kombo", f"{Y} → {Y} → hemen özel hareket komutu"),
             ("Süper Bitirici", "Özel hareket isabet edince → SÜPER komutu (süper bar dolu)"),
-            ("Hava Kombosu", "Zıpla + TEKME → yere inince YUMRUK → YUMRUK → özel hareket"),
+            ("Hava Kombosu", f"Zıpla + {T} → yere inince {Y} → {Y} → özel hareket"),
         ]
         y += 42
         for name, cmd in combos:

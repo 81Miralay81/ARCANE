@@ -215,3 +215,10 @@ class CPUController:
             self._seq([("d", None, 1), ("db", None, 1), ("b", sp["button"], 1)])
         elif m == "dp":
             self._seq([("f", None, 1), ("d", None, 1), ("df", sp["button"], 1)])
+
+
+def key_names(two_player, side):
+    """Ekranda gösterilecek klavye tuşları: {"P": yumruk tuşu, "K": tekme tuşu}."""
+    if two_player and side == 0:
+        return {"P": "F", "K": "G"}
+    return {"P": "K", "K": "L"}

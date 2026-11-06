@@ -155,8 +155,8 @@ def _limb(surf, a, b, w1, w2, color, outline, hl=None):
 
 def draw_fighter(*args, **kw):
     """Karakteri ekrana çizer. (x, y) ayakların zemine bastığı nokta."""
-    from games.fighter.render import draw_fighter_hd
-    return draw_fighter_hd(*args, **kw)
+    kw.pop("ss", None)
+    return draw_fighter_simple(*args, **kw)
 
 
 def draw_fighter_simple(surf, ch, pose, x, y, facing, grounded=True, flash=0, alpha_tint=None, t=0.0, palette=None):

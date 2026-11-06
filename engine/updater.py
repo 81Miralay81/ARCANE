@@ -43,6 +43,13 @@ def _worker(app):
         if not asset:
             app.update_phase = None
             return
+        if app.save.settings.get("update_attempt") == tag:
+            # bu sürüme güncelleme daha önce denendi ama olmadı: döngüye girme
+            app.update_phase = None
+            app.update_status = f"Yeni sürüm {tag} kurulamadı. GitHub Releases sayfasından elle indir."
+            app.save.settings["update_attempt"] = ""
+            app.save.save()
+            return
         app.update_tag = tag
         app.update_phase = "downloading"
         app.update_progress = 0.0
@@ -61,19 +68,25 @@ def _worker(app):
         if os.path.getsize(tmp) < total * 0.98:
             raise IOError("eksik indirme")
         exe = sys.executable
-        bat = os.path.join(tempfile.gettempdir(), "kanatix_update.bat")
-        with open(bat, "w", encoding="utf-8") as f:
-            # eski exe kapanana kadar dene, sonra yenisini başlat
-            f.write("@echo off\r\n"
-                    "set n=0\r\n"
-                    ":dene\r\n"
-                    "timeout /t 1 /nobreak >nul\r\n"
-                    f'copy /y "{tmp}" "{exe}" >nul 2>&1\r\n'
-                    "if errorlevel 1 (set /a n+=1 & if %n% lss 20 goto dene)\r\n"
-                    f'start "" "{exe}"\r\n'
-                    'del "%~f0"\r\n')
+        # PyInstaller tek dosya exe'de dosyayı kilitleyen asıl süreç üst süreçtir (bootloader).
+        # PowerShell'e UTF-16 kodlu komut veriyoruz: kullanıcı klasöründe Türkçe harf olsa da yol bozulmaz.
+        def q(x):
+            return "'" + str(x).replace("'", "''") + "'"
+        pids = ",".join(str(p) for p in {os.getpid(), os.getppid()})
+        ps = (f"$exe={q(exe)}; $tmp={q(tmp)}; "
+              f"foreach($p in @({pids})){{ while(Get-Process -Id $p -ErrorAction SilentlyContinue){{ Start-Sleep -Milliseconds 300 }} }}; "
+              "$ok=$false; for($i=0; $i -lt 20; $i++){ try { Copy-Item -LiteralPath $tmp -Destination $exe -Force -ErrorAction Stop; "
+              "$ok=$true; break } catch { Start-Sleep -Seconds 1 } }; "
+              # kopyalanamadıysa eski sürümü değil, indirilen yeni sürümü aç (döngüye girmesin)
+              "if($ok){ Start-Process -FilePath $exe } else { Start-Process -FilePath $tmp }")
+        import base64
+        enc = base64.b64encode(ps.encode("utf-16-le")).decode("ascii")
+        cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-EncodedCommand", enc]
+        st = app.save.settings
+        st["update_attempt"] = tag
+        app.save.save()
         app.update_phase = "restarting"
-        subprocess.Popen(["cmd", "/c", bat], creationflags=0x08000000)
+        subprocess.Popen(cmd, creationflags=0x08000000 | 0x00000008)  # pencere yok + bağımsız süreç
         app.running = False
     except Exception:
         app.update_phase = None

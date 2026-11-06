@@ -1,5 +1,13 @@
 # Sürüm Günlüğü
 
+## v1.1.2 (2026-11-06)
+**Neden:** Exe maç sırasında kapanıp yeniden açılıyordu; eski karakter ve arenalar istenmedi; ekrandaki tuş harfleri klavyedekiyle uyuşmuyordu.
+
+- Güncelleme döngüsü düzeltildi: eski exe tamamen kapanmadan dosya değiştirilemiyor, oyun eski sürümle yeniden açılıp her seferinde tekrar güncellemeye çalışıyordu. Artık exe'nin kapanması bekleniyor, Türkçe karakterli klasör yolları destekleniyor, aynı sürüm ikinci kez denenmiyor
+- Eski çizgi karakterler (Kaan, Zeyna, Demir) ve kodla çizilen arenalar kaldırıldı; yalnızca Daiki, Jax, Kaito, Titus ve 3 resimli arena kaldı
+- Ekrandaki tuş göstergeleri gerçek klavye tuşlarını gösteriyor (K = Yumruk, L = Tekme; 2 oyunculuda 1. oyuncu F / G)
+- APK derlemesi için Java 17 ayarı
+
 ## v1.1.1 (2026-11-06)
 **Neden:** Oyun açılınca güncellemenin otomatik ve görünür şekilde yapılması istendi.
 
