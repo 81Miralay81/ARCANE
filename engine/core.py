@@ -6,7 +6,7 @@ import sys
 
 import pygame
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 TITLE = "Kanatix Arcade"
 W, H = 1280, 720
 FPS = 60

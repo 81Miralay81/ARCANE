@@ -1,5 +1,12 @@
 # Sürüm Günlüğü
 
+## v1.3.1 (2026-11-06)
+**Neden:** Gölge Seferi 2. bölümde boss ekranın dışına çıkıp orada takılı kalıyordu.
+
+- Arenaya giren düşman ve boss'lar artık ekranın dışına çıkamıyor (atılma saldırısı dahil)
+- Duvar dibindeki oyuncuya düşmanlar diğer taraftan yaklaşıyor
+- Dışarıda takılı kalan düşman birkaç saniye sonra kendiliğinden içeri yürüyor
+
 ## v1.3.0 (2026-11-06)
 **Neden:** Aynı ağdaki iki bilgisayardan arkadaşla oynamak istendi.
 

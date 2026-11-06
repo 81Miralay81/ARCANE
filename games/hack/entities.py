@@ -586,6 +586,7 @@ class Enemy(Entity):
         self.slot = RNG.choice((-1, 1))
         self.zoff = RNG.uniform(-25, 25)
         self.aura = data.get("aura", (255, 200, 60) if elite else None)
+        self.entered = False
 
     def update(self, dt, scene, xmin, xmax):
         self.t += dt
@@ -620,6 +621,12 @@ class Enemy(Entity):
                     hero.x - self.slot * (d["reach"] + 140)
                 if not self.token and not self.boss and abs(dx) < d["reach"] + 120:
                     want_x = hero.x - self.slot * (d["reach"] + 170)
+            if scene.locked is not None:
+                L, R = scene.locked + 70, scene.locked + W - 70
+                if want_x < L or want_x > R:
+                    # duvar dibindeki oyuncuya diğer taraftan yaklaş
+                    want_x = 2 * hero.x - want_x
+                    want_x = max(L, min(R, want_x))
             want_z = hero.z + (0 if (self.token or self.boss or ai == "ranged") else self.zoff)
             mx = want_x - self.x
             mz = want_z - self.z
@@ -707,6 +714,18 @@ class Enemy(Entity):
                     self.remove = True
         if st not in ("walk",):
             self.vz *= 0.8
+        # arenaya bir kez giren düşman ekranın dışına çıkamaz
+        if scene.locked is not None:
+            L, R = scene.locked + 60, scene.locked + W - 60
+            if L <= self.x <= R:
+                self.entered = True
+            if self.entered:
+                xmin, xmax = max(xmin, L), min(xmax, R)
+            else:
+                self.outside_t = getattr(self, "outside_t", 0.0) + dt
+                if self.outside_t > 3.0 and not self.dead:
+                    # takılı kaldıysa içeri yürüt
+                    self.vx = (1 if self.x < L else -1) * max(3.0, self.speed)
         self.physics(dt, xmin, xmax)
 
     def choose_boss_move(self, scene, in_range):
