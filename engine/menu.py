@@ -52,6 +52,8 @@ class MainMenu(Scene):
         self.app.running = False
 
     def handle(self, e):
+        if getattr(self.app, "update_phase", None):
+            return   # güncelleme kontrolü / indirmesi sürerken menü kilitli
         fu = getattr(self.app, "forced_update", None)
         if fu:
             if is_confirm(e) or e.type == pygame.MOUSEBUTTONDOWN:
@@ -133,6 +135,24 @@ class MainMenu(Scene):
             if sel and sub:
                 text(s, sub, 17, (r.left + 24, r.centery + 15), (190, 210, 255), anchor="midleft", shadow=False)
         text(s, f"v{VERSION}   •   ↑↓ seç   ENTER başlat   F11 tam ekran", 18, (W // 2, H - 20), (190, 170, 220))
+        phase = getattr(self.app, "update_phase", None)
+        if phase == "checking":
+            pygame.draw.rect(s, (20, 10, 40), (0, 0, W, 34))
+            text(s, "Güncelleme kontrol ediliyor...", 20, (W // 2, 17), (190, 210, 255))
+        elif phase in ("downloading", "restarting"):
+            ov = pygame.Surface((W, H), pygame.SRCALPHA)
+            ov.fill((5, 0, 15, 225))
+            s.blit(ov, (0, 0))
+            tag = getattr(self.app, "update_tag", "")
+            text(s, "OTOMATİK GÜNCELLEME", 56, (W // 2, 240), GOLD, outline=4)
+            msg = f"Yeni sürüm {tag} indiriliyor..." if phase == "downloading" else "Oyun yeni sürümle yeniden başlatılıyor..."
+            text(s, msg, 26, (W // 2, 310), WHITE)
+            pr = getattr(self.app, "update_progress", 0.0)
+            bar = pygame.Rect(W // 2 - 300, 360, 600, 30)
+            pygame.draw.rect(s, (40, 30, 60), bar, border_radius=15)
+            pygame.draw.rect(s, (255, 190, 70), (bar.x, bar.y, int(bar.w * pr), bar.h), border_radius=15)
+            pygame.draw.rect(s, WHITE, bar, 2, border_radius=15)
+            text(s, f"%{int(pr * 100)}", 22, (W // 2, 420), (200, 190, 230))
         fu = getattr(self.app, "forced_update", None)
         if fu:
             ov = pygame.Surface((W, H), pygame.SRCALPHA)

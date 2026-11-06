@@ -1,5 +1,12 @@
 # Sürüm Günlüğü
 
+## v1.1.1 (2026-11-06)
+**Neden:** Oyun açılınca güncellemenin otomatik ve görünür şekilde yapılması istendi.
+
+- Açılışta güncelleme kontrolü; yeni sürüm varsa menü kilitlenir, ilerleme çubuğuyla indirilir ve oyun yeni sürümle kendiliğinden yeniden açılır
+- Eski exe kapanmadan kopyalanamazsa güncelleme betiği birkaç kez tekrar dener
+- Eksik indirilen dosya kurulmaz
+
 ## v1.1.0 (2026-11-06)
 **Neden:** Görseller zayıf bulundu, oyun takılıyordu, özel hareketler ekranda görünmüyordu ve telefon (APK) sürümü istendi.
 
