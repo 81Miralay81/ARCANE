@@ -1,8 +1,10 @@
 name: Build EXE
 
+# main dalına her gönderimde exe derlenir ve engine/core.py içindeki
+# VERSION numarasıyla (örn. v1.0.0) Releases sayfasına yüklenir.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -16,6 +18,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Surum numarasini oku
+        id: ver
+        shell: bash
+        run: echo "version=$(grep -oP '^VERSION = \"\K[^\"]+' engine/core.py)" >> "$GITHUB_OUTPUT"
       - name: Bagimliliklar
         run: |
           python -m pip install --upgrade pip
@@ -25,11 +31,14 @@ jobs:
       - name: Artifact yukle
         uses: actions/upload-artifact@v4
         with:
-          name: KanatixArcade
+          name: KanatixArcade-v${{ steps.ver.outputs.version }}
           path: dist/KanatixArcade.exe
-      - name: Release'e ekle
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Release olustur / guncelle
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: Kanatix Arcade v${{ steps.ver.outputs.version }}
+          target_commitish: ${{ github.sha }}
           files: dist/KanatixArcade.exe
           body_path: CHANGELOG.md
+          make_latest: true

@@ -69,14 +69,7 @@ python main.py
 
 **Kendi bilgisayarında:** `build_exe.bat` dosyasına çift tıkla. Exe `dist\KanatixArcade.exe` konumunda oluşur.
 
-**GitHub üzerinden (otomatik):** Repoya `v1.0.0` gibi bir etiket (tag) gönderdiğinde GitHub Actions exe'yi derler ve **Releases** sayfasına ekler:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-Etiket göndermeden de **Actions → Build EXE → Run workflow** ile derleyebilirsin. Exe, çalışmanın **Artifacts** kısmından indirilir.
+**GitHub üzerinden (otomatik):** `main` dalına her gönderimde (push) GitHub Actions exe'yi derler. Exe, `engine/core.py` içindeki `VERSION` numarasıyla **Releases** sayfasına yüklenir (örn. `v1.0.0`). Elle başlatmak için **Actions → Build EXE → Run workflow** seçeneğini kullan.
 
 ## Otomatik güncelleme
 
@@ -86,7 +79,7 @@ Repo adı `engine/updater.py` içindeki `GITHUB_REPO` satırında yazılıdır. 
 Yeni sürüm çıkarmak için:
 1. `engine/core.py` içindeki `VERSION` değerini artır (örn. `1.0.1`)
 2. `CHANGELOG.md` dosyasına ne değiştiğini ve nedenini yaz
-3. Aynı numarayla etiket gönder: `git tag v1.0.1 && git push origin v1.0.1`
+3. `main` dalına gönder (push). Exe derlenir, yeni sürüm Releases'a çıkar ve açık olan oyunlar kendini günceller.
 
 ## Ayarlar ve rekorlar
 
