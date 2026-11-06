@@ -31,6 +31,7 @@ class TouchPad:
         self.fingers = {}        # id -> (x, y, owner)
         self.stick_id = None
         self.knob = (0.0, 0.0)
+        self.center = self.STICK      # yön çemberi parmağın ilk değdiği yere gelir
         self.buttons = [
             Button("P", 1080, 620, 62, "YUMRUK", (255, 90, 80)),
             Button("K", 1200, 540, 62, "TEKME", (80, 170, 255)),
@@ -49,8 +50,19 @@ class TouchPad:
         self.labels["SUP"] = ch["super"]["name"]
 
     def _pos(self, e):
+        """Dokunma konumunu oyunun 1280x720 koordinatına çevirir.
+        Telefon ekranı daha geniş olduğu için iki yanda siyah boşluk kalır; onu hesaba katar."""
         if e.type in (pygame.FINGERDOWN, pygame.FINGERMOTION, pygame.FINGERUP):
-            return e.x * W, e.y * H
+            try:
+                ww, wh = pygame.display.get_window_size()
+            except Exception:
+                ww, wh = W, H
+            if ww <= 0 or wh <= 0:
+                ww, wh = W, H
+            sc = min(ww / W, wh / H)
+            ox = (ww - W * sc) / 2
+            oy = (wh - H * sc) / 2
+            return (e.x * ww - ox) / sc, (e.y * wh - oy) / sc
         return e.pos
 
     def handle(self, e):
@@ -75,6 +87,7 @@ class TouchPad:
             if x < W * 0.45 and y > H * 0.3:
                 self.stick_id = fid
                 self.fingers[fid] = (x, y, "stick")
+                self.center = (max(self.STICK_R, min(W * 0.45 - 20, x)), max(H * 0.3 + 40, min(H - 60, y)))
                 self._stick(x, y)
                 return True
             for b in self.buttons:
@@ -105,6 +118,7 @@ class TouchPad:
         if fid == self.stick_id:
             self.stick_id = None
             self.knob = (0.0, 0.0)
+            self.center = self.STICK
         info = self.fingers.pop(fid, None)
         if info:
             for b in self.buttons:
@@ -114,7 +128,7 @@ class TouchPad:
         return False
 
     def _stick(self, x, y):
-        cx, cy = self.STICK
+        cx, cy = self.center
         dx, dy = x - cx, y - cy
         d = math.hypot(dx, dy)
         if d > self.STICK_R:
@@ -147,7 +161,7 @@ class TouchPad:
         self.pressed.clear()
 
     def draw(self, s, fighter=None, t=0.0):
-        cx, cy = self.STICK
+        cx, cy = (int(self.center[0]), int(self.center[1]))
         ov = pygame.Surface((W, H), pygame.SRCALPHA)
         pygame.draw.circle(ov, (255, 255, 255, 34), (cx, cy), self.STICK_R)
         pygame.draw.circle(ov, (255, 255, 255, 110), (cx, cy), self.STICK_R, 3)

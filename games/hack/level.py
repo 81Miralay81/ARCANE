@@ -60,7 +60,7 @@ class HackTouch:
 
     def draw(self, s, hero):
         p = self.pad
-        cx, cy = p.STICK
+        cx, cy = (int(p.center[0]), int(p.center[1]))
         ov = pygame.Surface((W, H), pygame.SRCALPHA)
         pygame.draw.circle(ov, (255, 255, 255, 34), (cx, cy), p.STICK_R)
         pygame.draw.circle(ov, (255, 255, 255, 110), (cx, cy), p.STICK_R, 3)

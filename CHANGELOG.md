@@ -1,5 +1,11 @@
 # Sürüm Günlüğü
 
+## v1.3.2 (2026-11-06)
+**Neden:** Telefonda karakter kendi kendine yürüyor, bırakınca aşağı iniyor; Dövüş Arenası'nda ileri-geri gidilemiyordu.
+
+- Dokunmatik konum hesabı düzeltildi: geniş telefon ekranlarında iki yandaki siyah boşluk hesaba katılmıyordu, parmak olduğundan farklı yerde sanılıyordu (tuşlar dahil)
+- Yön çemberi artık parmağın ilk değdiği yerde açılıyor (yüzer joystick); parmağı kaldırınca karakter durur
+
 ## v1.3.1 (2026-11-06)
 **Neden:** Gölge Seferi 2. bölümde boss ekranın dışına çıkıp orada takılı kalıyordu.
 
