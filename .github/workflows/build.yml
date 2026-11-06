@@ -136,6 +136,9 @@ jobs:
             sleep 45
             adb exec-out screencap -p > emulator_ekran.png
             adb logcat -d > logcat.txt
+            echo "=== SUREC ===" ; adb shell pidof com.kanatix.kanatixarcade || echo "UYGULAMA CALISMIYOR"
+            echo "=== LOGCAT ===" ; grep -i -E "python|kanatix|AndroidRuntime|DEBUG|libc|SDL|crash|fatal|Traceback|Error" logcat.txt | tail -300
+            echo "=== EKRAN BASE64 ===" ; base64 -w0 emulator_ekran.png ; echo ; echo "=== SON ==="
       - uses: actions/upload-artifact@v4
         if: always()
         with:
