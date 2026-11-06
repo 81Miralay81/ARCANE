@@ -7,7 +7,7 @@ source.include_exts = py,png,jpg,ttf,json,txt
 source.exclude_dirs = tools,.github,build,dist,bin,.buildozer,__pycache__,p4a-recipes
 version.regex = VERSION = "(.*)"
 version.filename = %(source.dir)s/engine/core.py
-requirements = python3,pygame,pyjnius
+requirements = python3,pygame,pyjnius,certifi
 orientation = landscape
 fullscreen = 1
 icon.filename = %(source.dir)s/assets/icon.png

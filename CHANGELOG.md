@@ -1,5 +1,11 @@
 # Sürüm Günlüğü
 
+## v1.3.3 (2026-11-06)
+**Neden:** Telefon yeni sürümü görmüyordu (güncelleme ekranı çıkmıyordu).
+
+- Android'deki Python'da güvenli bağlantı (HTTPS) için sertifika listesi yoktu; GitHub'a bağlanılamadığı için güncelleme kontrolü sessizce başarısız oluyordu. certifi sertifika listesi eklendi
+- Güncelleme kontrolünün sonucu artık kayda yazılıyor (emülatör testinde doğrulanıyor)
+
 ## v1.3.2 (2026-11-06)
 **Neden:** Telefonda karakter kendi kendine yürüyor, bırakınca aşağı iniyor; Dövüş Arenası'nda ileri-geri gidilemiyordu.
 

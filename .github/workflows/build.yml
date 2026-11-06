@@ -145,6 +145,7 @@ jobs:
             adb shell monkey -p com.kanatix.kanatixarcade -c android.intent.category.LAUNCHER 1
             sleep 45
             adb exec-out screencap -p > emulator_ekran.png
+            adb logcat -d | grep -i "ncelleme" || echo "guncelleme kaydi yok"
             adb logcat -d > logcat.txt
             echo "=== SUREC ===" ; adb shell pidof com.kanatix.kanatixarcade || echo "UYGULAMA CALISMIYOR"
             echo "=== LOGCAT ===" ; grep -i -E "python|kanatix|AndroidRuntime|DEBUG|libc|SDL|crash|fatal|Traceback|Error" logcat.txt | tail -300

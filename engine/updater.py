@@ -18,6 +18,20 @@ GITHUB_REPO = "81Miralay81/ARCANE"
 ASSET_NAME = "KanatixArcade.exe"
 
 
+def _ssl_context():
+    """Telefonda Python'un kendi sertifika listesi yok; certifi paketindeki listeyi kullan."""
+    import ssl
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
+
+
+def _open(req, timeout):
+    return urllib.request.urlopen(req, timeout=timeout, context=_ssl_context())
+
+
 def _ver(v):
     v = v.lstrip("vV")
     out = []
@@ -53,7 +67,7 @@ def _worker(app):
     try:
         url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
         req = urllib.request.Request(url, headers={"User-Agent": "KanatixArcade-Updater"})
-        with urllib.request.urlopen(req, timeout=8) as r:
+        with _open(req, 8) as r:
             info = json.loads(r.read().decode("utf-8"))
         tag = info.get("tag_name", "")
         if _ver(tag) <= _ver(VERSION):
@@ -80,7 +94,7 @@ def _worker(app):
             part = new + ".part"
             req = urllib.request.Request(asset["browser_download_url"], headers={"User-Agent": "KanatixArcade-Updater"})
             done = 0
-            with urllib.request.urlopen(req, timeout=60) as r, open(part, "wb") as f:
+            with _open(req, 60) as r, open(part, "wb") as f:
                 while True:
                     chunk = r.read(65536)
                     if not chunk:
@@ -134,21 +148,24 @@ def _report_last_error(app):
 APK_NAME = "KanatixArcade.apk"
 
 
+
 def _android_worker(app):
     """Telefonda: yeni APK varsa zorunlu güncelleme ekranı gösterilir."""
     try:
         url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
         req = urllib.request.Request(url, headers={"User-Agent": "KanatixArcade-Updater"})
-        with urllib.request.urlopen(req, timeout=8) as r:
+        with _open(req, 8) as r:
             info = json.loads(r.read().decode("utf-8"))
         tag = info.get("tag_name", "")
         if _ver(tag) <= _ver(VERSION):
+            print(f"Güncelleme kontrolü: güncel ({VERSION})", flush=True)
             return
         asset = next((a for a in info.get("assets", []) if a.get("name") == APK_NAME), None)
         if asset:
             app.forced_update = (tag, asset["browser_download_url"])
-    except Exception:
-        pass
+        print(f"Güncelleme kontrolü: sunucudaki son sürüm {tag}, bu cihaz {VERSION}", flush=True)
+    except Exception as e:
+        print(f"Güncelleme kontrolü başarısız: {e}", flush=True)
 
 
 def open_url(url):
