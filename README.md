@@ -10,11 +10,27 @@ Retro atari salonu derlemesi. Windows için tek `.exe`, Android için `.apk`.
 
 | Oyun | Açıklama |
 |------|----------|
+| **Gölge Seferi** | Hack and slash: 4 kahraman, yetenekler ve ultimate'ler, 3 bölüm + boss'lar, seviye/XP/altın ilerlemesi, Kabus zorluğu |
 | **Dövüş Arenası** | 4 dövüşçü (Daiki, Jax, Kaito, Titus), özel ve süper hareketler, kombolar, 3 arena (Ejder Kalesi, Neon Çatı, Gece Metrosu). 1P (bilgisayara karşı) veya 2P |
 | **Neon Yılan** | Klasik yılan oyunu, altın elmalar |
 | **Tuğla Kırıcı** | Seviyeler ve güçlendirmeler (geniş raket, çoklu top, ekstra can) |
 | **Uzay İstilası** | Dalga dalga gelen uzaylılar, kalkanlar, bonus ana gemi |
 | **Neon Pong** | Bilgisayara ya da arkadaşına karşı |
+
+## Gölge Seferi kontrolleri
+
+| Tuş | İşlev |
+|--|--|
+| WASD / Oklar | Hareket (sağ-sol ve ileri-geri) |
+| K veya J | Saldırı (3'lü kombo) |
+| L | Ağır saldırı (düşmanı havaya kaldırır) |
+| Boşluk | Zıpla (havada K: hava saldırısı) |
+| Shift | Kaç (kısa süre hasar almazsın) |
+| 1 / U, 2 / I, 3 / O | Yetenekler |
+| 4 / P | Ultimate |
+| H veya Q | Can iksiri |
+
+Bölümleri bitirdikçe XP ve altın kazanırsın. Kampta yetenek puanlarıyla yetenekleri 5. seviyeye kadar, altınla da can / güç / kritik / enerjiyi geliştirirsin. 3 bölümü bitirince **Kabus** zorluğu açılır.
 
 ## Dövüş Arenası kontrolleri
 

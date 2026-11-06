@@ -86,3 +86,60 @@ jobs:
           target_commitish: ${{ github.sha }}
           files: KanatixArcade.apk
           body_path: CHANGELOG.md
+
+  # Emülatörde açılış testi: APK'nın açılıp açılmadığını ve hata kaydını görmek için
+  apk-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Buildozer onbellegi (x86_64)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            .buildozer
+          key: buildozer-x86-${{ hashFiles('buildozer.spec') }}
+      - name: Sistem paketleri
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip python3-pip autoconf libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev automake
+      - name: Buildozer kur
+        run: pip install --upgrade buildozer cython==0.29.36 setuptools
+      - name: Emülatör için APK (x86_64)
+        env:
+          APP_ANDROID_ARCHS: x86_64
+        run: yes | buildozer -v android debug
+      - name: KVM ac
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Emulatorde ac ve kaydi al
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: default
+          disable-animations: true
+          script: |
+            adb install -r bin/*.apk
+            adb logcat -c
+            adb shell monkey -p com.kanatix.kanatixarcade -c android.intent.category.LAUNCHER 1
+            sleep 45
+            adb exec-out screencap -p > emulator_ekran.png
+            adb logcat -d > logcat.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emulator-test
+          path: |
+            logcat.txt
+            emulator_ekran.png

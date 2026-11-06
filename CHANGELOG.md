@@ -1,5 +1,16 @@
 # Sürüm Günlüğü
 
+## v1.2.0 (2026-11-06)
+**Neden:** Kapsamlı bir hack and slash modu istendi; APK telefonda açılır açılmaz kapanıyordu.
+
+- YENİ MOD: Gölge Seferi (hack and slash). 4 kahraman, her birine 3 yetenek + 1 ultimate (sinematik giriş), kombo zinciri, ağır saldırı, zıplama saldırısı, kaçma
+- 4 gölge düşman türü + elit düşmanlar, 3 bölüm, her bölümde 4 dalga ve boss (öfke evresi, meteor, çağırma, dalga saldırıları)
+- İlerleme: XP ve seviye, seviyeyle açılan yetenekler, yetenek puanları (5 seviye), altınla can/güç/kritik/enerji geliştirmeleri, iksirler, Kabus zorluğu, kayıtlı ilerleme
+- Kombo rütbesi (D'den SSS'ye), hasar sayıları, kritik vuruşlar, kılıç izleri, şok dalgaları, ganimet toplama
+- Telefon için ayrı oyun kolu: saldırı / ağır / zıpla / kaç / 4 yetenek / iksir
+- Hata olursa oyun artık sessizce kapanmıyor, hatayı ekranda gösteriyor
+- APK açılış sorununu bulmak için emülatör testi eklendi
+
 ## v1.1.2 (2026-11-06)
 **Neden:** Exe maç sırasında kapanıp yeniden açılıyordu; eski karakter ve arenalar istenmedi; ekrandaki tuş harfleri klavyedekiyle uyuşmuyordu.
 
