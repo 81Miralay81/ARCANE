@@ -49,13 +49,16 @@ jobs:
       - name: Surum numarasini oku
         id: ver
         run: echo "version=$(grep -oP '^VERSION = \"\K[^\"]+' engine/core.py)" >> "$GITHUB_OUTPUT"
-      - name: Buildozer onbellegi
+      - name: Android SDK/NDK onbellegi
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.buildozer
-            .buildozer
-          key: buildozer-${{ hashFiles('buildozer.spec') }}
+          path: ~/.buildozer
+          key: sdk-${{ hashFiles('buildozer.spec') }}
+      - name: Derleme onbellegi
+        uses: actions/cache@v4
+        with:
+          path: .buildozer
+          key: build-${{ hashFiles('buildozer.spec', 'p4a-recipes/**') }}
       - name: Sistem paketleri
         run: |
           sudo apt-get update
@@ -99,13 +102,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Buildozer onbellegi (x86_64)
+      - name: Android SDK/NDK onbellegi (x86_64)
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.buildozer
-            .buildozer
-          key: buildozer-x86-${{ hashFiles('buildozer.spec') }}
+          path: ~/.buildozer
+          key: sdk-x86-${{ hashFiles('buildozer.spec') }}
+      - name: Derleme onbellegi (x86_64)
+        uses: actions/cache@v4
+        with:
+          path: .buildozer
+          key: build-x86-${{ hashFiles('buildozer.spec', 'p4a-recipes/**') }}
       - name: Sistem paketleri
         run: |
           sudo apt-get update

@@ -1,5 +1,11 @@
 # Sürüm Günlüğü
 
+## v1.2.1 (2026-11-06)
+**Neden:** APK telefonda açılır açılmaz kapanıyordu; Windows güncellemesi %0'da kayboluyordu.
+
+- APK düzeltmesi: telefon için derlenen pygame'de çizim modülünün bir parçası (SIMD blit) eksikti, oyun ekrana hiçbir şey çizemeden kapanıyordu. Eksik dosyalar derlemeye eklendi (emülatör kaydıyla bulundu)
+- Windows güncelleyici: her sürüm ayrı dosyaya iniyor, asıl exe yolu hatırlanıyor, hata olursa ekranda nedeni yazıyor
+
 ## v1.2.0 (2026-11-06)
 **Neden:** Kapsamlı bir hack and slash modu istendi; APK telefonda açılır açılmaz kapanıyordu.
 
