@@ -10,6 +10,7 @@ from games.fighter.characters import CHARACTERS, MOTION_TEXT
 from games.fighter.controls import KEYMAP_SOLO, KEYMAPS, CPUController, HumanController
 from games.fighter.fighter import GROUND, MAX_METER, SUPER_COST, Fighter, InputState
 from games.fighter.skeleton import POSES, blend, draw_fighter
+from games.fighter import sprites
 from games.fighter.stages import STAGE_W, STAGES
 
 ROUND_TIME = 99
@@ -32,7 +33,44 @@ class FighterSelect(Scene):
     def on_enter(self):
         self.app.audio.play_music("menu")
 
+    def char_rects(self):
+        n = len(CHARACTERS)
+        cw = 150
+        x0 = W // 2 - (n * cw) // 2
+        return [pygame.Rect(x0 + i * cw + 10, 560, cw - 20, 130) for i in range(n)]
+
     def handle(self, e):
+        if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+            x, y = e.pos
+            if x < 160 and y < 90:
+                e = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE)
+            elif self.phase == "char":
+                for i, r in enumerate(self.char_rects()):
+                    if r.collidepoint(x, y):
+                        p = 0 if not self.done[0] else 1
+                        if self.done[p]:
+                            return
+                        if self.cur[p] == i:
+                            self.done[p] = True
+                            self.app.audio.play("select")
+                            if all(self.done):
+                                if not self.two:
+                                    self.cur[1] = random.choice([j for j in range(len(CHARACTERS)) if j != self.cur[0]])
+                                self.phase = "stage"
+                                self.stage_i = random.randrange(len(STAGES))
+                        else:
+                            self.cur[p] = i
+                            self.preview_t[p] = 0
+                            self.app.audio.play("menu")
+                        return
+                return
+            else:
+                if x < W // 3:
+                    e = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_LEFT)
+                elif x > W * 2 // 3:
+                    e = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RIGHT)
+                else:
+                    e = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN)
         if is_back(e):
             self.app.audio.play("back")
             if self.phase == "stage":
@@ -105,6 +143,13 @@ class FighterSelect(Scene):
             x = i * 90 + (self.t * 40) % 90
             pygame.draw.line(s, (40, 18, 60), (x, 0), (x - 300, H), 18)
         text(s, "KARAKTER SEÇ" if self.phase == "char" else "ARENA SEÇ", 52, (W // 2, 50), GOLD, outline=3)
+        pygame.draw.rect(s, (40, 24, 60), (20, 20, 120, 46), border_radius=12)
+        text(s, "◄ GERİ", 22, (80, 43), WHITE)
+        if self.app.touch_mode:
+            msg = "Karaktere dokun, onaylamak için tekrar dokun" if self.phase == "char" else "Sağa/sola dokunarak değiştir, ortaya dokunarak başla"
+            text(s, msg, 20, (W // 2, 92), (190, 210, 255))
+        text(s, "Karakter çizimleri: Sujal V Kanchan — StreetFighter2D-Game (MIT)", 13, (W - 12, 12), (130, 120, 160),
+             anchor="topright", shadow=False)
         if self.phase == "char":
             self.draw_chars(s)
         else:
@@ -112,14 +157,17 @@ class FighterSelect(Scene):
 
     def draw_chars(self, s):
         n = len(CHARACTERS)
-        cw = 170
+        cw = 150
         x0 = W // 2 - (n * cw) // 2
         for i, ch in enumerate(CHARACTERS):
             r = pygame.Rect(x0 + i * cw + 10, 560, cw - 20, 130)
             pygame.draw.rect(s, (30, 20, 50), r, border_radius=12)
             clip = s.get_clip()
             s.set_clip(r)
-            draw_fighter(s, dict(ch, scale=ch["scale"] * 0.72), POSES["idle"], r.centerx, r.bottom + 38, 1, t=self.t)
+            if ch.get("sprite"):
+                sprites.draw_static(s, ch["sprite"], "Idle", int(self.t * 10), r.centerx, r.bottom + 70, 1, 0.55)
+            else:
+                draw_fighter(s, dict(ch, scale=ch["scale"] * 0.72), POSES["idle"], r.centerx, r.bottom + 38, 1, t=self.t)
             s.set_clip(clip)
             text(s, ch["name"], 22, (r.centerx, r.bottom - 14), WHITE)
             for p in (0, 1):
@@ -141,7 +189,14 @@ class FighterSelect(Scene):
             pal = ch["palette"] if not (self.two and p == 1 and self.cur[0] == self.cur[1]) else ch["alt"]
             big = dict(ch, scale=ch["scale"] * 1.75)
             pygame.draw.ellipse(s, (10, 5, 20), (cx - 110, 518, 220, 30))
-            draw_fighter(s, big, pose, cx, 530, facing, t=self.t, palette=pal, ss=1)
+            if ch.get("sprite"):
+                if self.done[p]:
+                    ss_ = sprites.get(ch["sprite"])
+                    sprites.draw_static(s, ch["sprite"], "Attack_3", ss_.meta["peak"]["Attack_3"], cx, 540, facing, 1.35)
+                else:
+                    sprites.draw_static(s, ch["sprite"], "Idle", int(self.t * 10), cx, 540, facing, 1.35)
+            else:
+                draw_fighter(s, big, pose, cx, 530, facing, t=self.t, palette=pal, ss=1)
             tx = cx + (260 if p == 0 else -260)
             anchor = "midleft" if p == 0 else "midright"
             ax = tx - 60 if p == 0 else tx + 60
@@ -155,6 +210,18 @@ class FighterSelect(Scene):
                 bx = ax + 50 if p == 0 else ax - 50 - 200
                 pygame.draw.rect(s, (40, 30, 60), (bx, y - 8, 200, 16), border_radius=8)
                 pygame.draw.rect(s, ch["fx"], (bx, y - 8, int(200 * min(1, v)), 16), border_radius=8)
+            # özel hareketler
+            btn = {"P": "Yumruk", "K": "Tekme"}
+            rows = [(sp["name"], MOTION_TEXT[sp["motion"]] + " + " + btn[sp["button"]]) for sp in ch["specials"]]
+            rows.append(("SÜPER: " + ch["super"]["name"], MOTION_TEXT[ch["super"]["motion"]] + " + " + btn[ch["super"]["button"]]))
+            for j, (nm, cmd) in enumerate(rows):
+                yy = 428 + j * 27
+                if p == 0:
+                    text(s, nm, 19, (ax, yy), GOLD if j == 3 else WHITE, anchor="midleft")
+                    text(s, cmd if not self.app.touch_mode else "", 19, (ax + 250, yy), CYAN, anchor="midleft")
+                else:
+                    text(s, nm, 19, (ax, yy), GOLD if j == 3 else WHITE, anchor="midright")
+                    text(s, cmd if not self.app.touch_mode else "", 19, (ax - 250, yy), CYAN, anchor="midright")
             if self.done[p]:
                 text(s, "HAZIR!", 40, (cx, 600 - 80), GOLD, outline=3)
         if not self.two:
@@ -178,10 +245,19 @@ class FighterSelect(Scene):
             text(s, line, 20, (x, y), (220, 220, 235), anchor=anchor)
 
     def draw_stages(self, s):
-        stage = STAGES[self.stage_i]()
-        prev = pygame.Surface((W, H))
-        stage.draw_back(prev, 300)
-        thumb = pygame.transform.smoothscale(prev, (800, 450))
+        if not hasattr(self, "thumbs"):
+            self.thumbs = {}
+        if self.stage_i not in self.thumbs:
+            stage = STAGES[self.stage_i]()
+            prev = pygame.Surface((W, H))
+            stage.draw_back(prev, 300)
+            self.thumbs[self.stage_i] = (stage.name, pygame.transform.smoothscale(prev, (800, 450)))
+        name, thumb = self.thumbs[self.stage_i]
+
+        class _S:
+            pass
+        stage = _S()
+        stage.name = name
         r = thumb.get_rect(center=(W // 2, 360))
         pygame.draw.rect(s, GOLD, r.inflate(12, 12), 4, border_radius=10)
         s.blit(thumb, r)
@@ -277,17 +353,26 @@ class FightScene(Scene):
         self.show_moves = False
         self.freeze_input = True
         self.t = 0.0
+        self.show_skills = app.save.settings.get("show_skills", True)
         diff = app.save.settings.get("difficulty", 1)
         joys = app.joysticks
         ch1, ch2 = CHARACTERS[c1], CHARACTERS[c2]
+        self.touch = None
+        if app.touch_mode:
+            from engine.touch import TouchPad
+            self.touch = TouchPad()
+            self.touch.set_skill_labels(CHARACTERS[c1])
         if two_player:
-            ctrl1 = HumanController(KEYMAPS[0], joys[0] if len(joys) > 0 else None)
+            ctrl1 = HumanController(KEYMAPS[0], joys[0] if len(joys) > 0 else None, self.touch)
             ctrl2 = HumanController(KEYMAPS[1], joys[1] if len(joys) > 1 else None)
         else:
-            ctrl1 = HumanController(KEYMAP_SOLO, joys[0] if joys else None)
+            ctrl1 = HumanController(KEYMAP_SOLO, joys[0] if joys else None, self.touch)
             ctrl2 = CPUController(diff)
         pal2 = ch2["alt"] if c1 == c2 else ch2["palette"]
         self.f = [Fighter(ch1, ch1["palette"], 0, 1, 0, ctrl1), Fighter(ch2, pal2, 0, -1, 1, ctrl2)]
+        for ch in (ch1, ch2):
+            if ch.get("sprite"):
+                sprites.get(ch["sprite"]).preload()
         self.timer = ROUND_TIME
         self.match_over = False
         self.start_round()
@@ -323,12 +408,32 @@ class FightScene(Scene):
     def projectile_threat(self, f):
         return any(p.owner is not f for p in self.projectiles)
 
+    def _tap(self, e):
+        """Dokunma / tıklama konumu (menüler için)."""
+        if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+            return e.pos
+        return None
+
     def handle(self, e):
+        if self.touch is not None and not self.paused and not self.match_over:
+            if self.touch.handle(e):
+                if self.touch.take("PAUSE"):
+                    self.paused = True
+                    self.pause_i = 0
+                    self.app.audio.play("back")
+                return
+        tap = self._tap(e)
         if self.paused:
             if self.show_moves:
-                if is_back(e) or is_confirm(e):
+                if is_back(e) or is_confirm(e) or tap:
                     self.show_moves = False
                 return
+            if tap:
+                for i in range(4):
+                    if pygame.Rect(W // 2 - 200, 260 + i * 74, 400, 58).collidepoint(tap):
+                        self.pause_i = i
+                        e = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN)
+                        break
             d = nav_dir(e)
             if d and d[1]:
                 self.pause_i = (self.pause_i + d[1]) % 4
@@ -353,7 +458,12 @@ class FightScene(Scene):
             elif is_back(e):
                 self.paused = False
             return
-        if e.type == pygame.KEYDOWN and e.key in (pygame.K_ESCAPE, pygame.K_p) or \
+        if e.type == pygame.KEYDOWN and e.key == pygame.K_TAB:
+            self.show_skills = not self.show_skills
+            self.app.save.settings["show_skills"] = self.show_skills
+            self.app.save.save()
+            return
+        if e.type == pygame.KEYDOWN and e.key in (pygame.K_ESCAPE, pygame.K_p, pygame.K_AC_BACK) or \
                 (e.type == pygame.JOYBUTTONDOWN and e.button in (7, 9)):
             if self.match_over:
                 self.app.audio.stop_music()
@@ -363,6 +473,11 @@ class FightScene(Scene):
             self.pause_i = 0
             self.app.audio.play("back")
             return
+        if self.match_over and tap:
+            for i in range(2):
+                if pygame.Rect(W // 2 - 160, 380 + i * 70, 320, 54).collidepoint(tap):
+                    self.match_choice = i
+                    e = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN)
         if self.match_over and (is_confirm(e) or (e.type == pygame.KEYDOWN and e.key in (pygame.K_f, pygame.K_k))):
             if self.phase_t > 1.5:
                 if self.match_choice == 0:
@@ -463,7 +578,11 @@ class FightScene(Scene):
             return
         if a.state in ("down", "ko") or b.state in ("down", "ko"):
             return
-        mind = 62 * (a.ch["scale"] + b.ch["scale"]) / 2
+        def bw(f):
+            if f.ch.get("sprite"):
+                return sprites.get(f.ch["sprite"]).width * 0.42
+            return 62 * f.ch["scale"]
+        mind = (bw(a) + bw(b)) / 2
         dx = b.x - a.x
         if abs(dx) < mind:
             over = (mind - abs(dx)) / 2
@@ -511,7 +630,7 @@ class FightScene(Scene):
                 self.parts.emit(ev[1] + random.uniform(-60, 60), ev[2] + random.uniform(-60, 60), 3, ev[3], speed=2,
                                 life=18, size=5, gravity=-0.1, glow=True)
             elif kind == "super_flash":
-                self.super_freeze = 42
+                self.super_freeze = 32
                 self.super_owner = f
                 self.shake = 6
             elif kind == "special_name":
@@ -601,9 +720,9 @@ class FightScene(Scene):
             if att.combo >= 2:
                 self.popup(f"{att.combo} VURUŞ!", 0, 0, GOLD, 36, 70, hud_side=att.side)
             if res == "ko":
-                self.hitstop = 30
+                self.hitstop = 18
                 self.app.audio.play("ko")
-                self.slowmo = 90
+                self.slowmo = 60
                 self.stage.excite = 2.5
         return res
 
@@ -687,7 +806,7 @@ class FightScene(Scene):
             o = self.super_owner
             if o:
                 cx, cy = int(o.x - camx), int(o.y - camy - 100)
-                k = self.super_freeze / 42
+                k = self.super_freeze / 32
                 rays = pygame.Surface((W, H), pygame.SRCALPHA)
                 for i in range(18):
                     a = i / 18 * math.tau + self.t * 2
@@ -713,6 +832,11 @@ class FightScene(Scene):
                 tint = (255, 255, 255)
             if self.super_freeze and self.super_owner is f:
                 blit_glow(s, (int(f.x - camx), int(f.y - camy - 90)), 140, shade(f.ch["fx"], 0.6), 1.0)
+            if f.action is not None and f.action.kind != "normal":
+                blit_glow(s, (int(f.x - camx), int(f.y - camy - 150)), 150, shade(f.ch["fx"], 0.45), 1.0)
+            if f.ch.get("sprite"):
+                sprites.draw(world, f, f.x - camx, f.y - camy, flash)
+                continue
             draw_fighter(world, f.ch, f.pose, f.x - camx, f.y - camy, f.facing, f.draw_grounded(), flash, tint,
                          t=f.anim_t, palette=f.palette)
         for p in self.projectiles:
@@ -731,6 +855,8 @@ class FightScene(Scene):
                 text(s, p["msg"], int(p["size"] * sc), (x, 200), p["color"], anchor=anchor, outline=3, alpha=a)
             else:
                 text(s, p["msg"], p["size"], (p["x"] - camx, p["y"] - camy - (1 - k) * 30), p["color"], outline=3, alpha=a)
+        if self.touch is not None and not self.paused and not self.match_over:
+            self.touch.draw(s, self.f[0], self.t)
         self.draw_announcer(s)
         if self.paused:
             self.draw_pause(s)
@@ -804,17 +930,46 @@ class FightScene(Scene):
             lbl = "SÜPER HAZIR!" if f.meter >= SUPER_COST else "SÜPER"
             text(s, lbl, 18, (mx + (0 if i == 0 else 300), my - 16), GOLD if f.meter >= SUPER_COST else (200, 190, 220),
                  anchor="midleft" if i == 0 else "midright")
+        if self.show_skills and not getattr(self.app, "touch_mode", False):
+            for i, f in enumerate(self.f):
+                if self.two or i == 0:
+                    self.draw_skill_panel(s, f, i)
         # zaman
         tr = pygame.Rect(W // 2 - 48, 20, 96, 70)
         pygame.draw.rect(s, (20, 14, 30), tr, border_radius=12)
         pygame.draw.rect(s, (210, 190, 140), tr, 3, border_radius=12)
         tv = max(0, int(math.ceil(self.timer)))
         text(s, f"{tv:02d}", 46, tr.center, RED if tv <= 10 else WHITE, outline=2)
-        if self.two:
+        if self.two or self.touch is not None:
             ctrl = ""
         else:
-            ctrl = "ESC: Duraklat / Hareket Listesi"
+            ctrl = "ESC: Duraklat / Hareket Listesi   •   TAB: Özel hareketleri göster/gizle"
         text(s, ctrl, 16, (W // 2, H - 18), (220, 210, 240))
+
+    MIRROR = str.maketrans("→←↘↙↗↖", "←→↙↘↖↗")
+
+    def draw_skill_panel(self, s, f, i):
+        """Ekranda özel hareketler ve komutları (karakterin baktığı yöne göre)."""
+        btn = {"P": "Y", "K": "T"}
+        rows = [(sp["name"], MOTION_TEXT[sp["motion"]], btn[sp["button"]], False) for sp in f.ch["specials"]]
+        sup = f.ch["super"]
+        rows.append((sup["name"], MOTION_TEXT[sup["motion"]], btn[sup["button"]], True))
+        pw, ph = 330, 22 * len(rows) + 14
+        x = 36 if i == 0 else W - 36 - pw
+        y = H - 74 - ph
+        panel = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        panel.fill((8, 4, 18, 150))
+        s.blit(panel, (x, y))
+        for j, (name, cmd, b, is_sup) in enumerate(rows):
+            if f.facing < 0:
+                cmd = cmd.translate(self.MIRROR)
+            cy = y + 18 + j * 22
+            ready = (not is_sup) or f.meter >= SUPER_COST
+            col = (GOLD if is_sup else (235, 235, 245)) if ready else (120, 110, 140)
+            text(s, cmd.replace(" ", "") + " +" + b, 17, (x + 10, cy), CYAN if ready else (90, 100, 130),
+                 anchor="midleft", shadow=False)
+            text(s, name, 17, (x + pw - 10, cy), col, anchor="midright", shadow=False)
+        text(s, "Y = Yumruk  T = Tekme   (TAB: gizle)", 13, (x + pw // 2, y - 9), (170, 160, 200), shadow=False)
 
     def draw_announcer(self, s):
         t = self.phase_t
@@ -908,9 +1063,10 @@ class FightScene(Scene):
                 text(s, name, 22, (x, y), GOLD if name.startswith("SÜPER") else WHITE, anchor="midleft")
                 text(s, cmd, 22, (x + 260, y), CYAN, anchor="midleft")
                 y += 36
-        y = 390
+        y = 380
         text(s, "KOMBOLAR", 30, (90, y), GOLD, anchor="midleft", outline=2)
         combos = [
+            ("Ustalık Kombosu", "YUMRUK → YUMRUK → TEKME → TEKME → özel hareket → SÜPER"),
             ("Zincir Kombo", "YUMRUK → YUMRUK → TEKME  (3 vuruş, yere serer)"),
             ("Alçak Zincir", "↓+YUMRUK → ↓+YUMRUK → ↓+TEKME  (süpürme, yere serer)"),
             ("İptal Kombo", "YUMRUK → YUMRUK → hemen özel hareket komutu"),
@@ -921,7 +1077,7 @@ class FightScene(Scene):
         for name, cmd in combos:
             text(s, name, 22, (90, y), WHITE, anchor="midleft")
             text(s, cmd, 22, (330, y), CYAN, anchor="midleft")
-            y += 34
+            y += 31
         text(s, "Geri adım = blok  •  ↓ + geri = alçak blok  •  Hava saldırıları ayakta bloklanır", 20, (W // 2, H - 60),
              (220, 210, 240))
         text(s, "Kapatmak için ENTER / ESC", 18, (W // 2, H - 28), (160, 150, 190))

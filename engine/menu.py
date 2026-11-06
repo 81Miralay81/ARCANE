@@ -52,6 +52,12 @@ class MainMenu(Scene):
         self.app.running = False
 
     def handle(self, e):
+        fu = getattr(self.app, "forced_update", None)
+        if fu:
+            if is_confirm(e) or e.type == pygame.MOUSEBUTTONDOWN:
+                from engine.updater import open_url
+                open_url(fu[1])
+            return
         d = nav_dir(e)
         if d and d[1]:
             self.i = (self.i + d[1]) % len(self.items)
@@ -127,6 +133,18 @@ class MainMenu(Scene):
             if sel and sub:
                 text(s, sub, 17, (r.left + 24, r.centery + 15), (190, 210, 255), anchor="midleft", shadow=False)
         text(s, f"v{VERSION}   •   ↑↓ seç   ENTER başlat   F11 tam ekran", 18, (W // 2, H - 20), (190, 170, 220))
+        fu = getattr(self.app, "forced_update", None)
+        if fu:
+            ov = pygame.Surface((W, H), pygame.SRCALPHA)
+            ov.fill((5, 0, 15, 225))
+            s.blit(ov, (0, 0))
+            text(s, "YENİ SÜRÜM VAR", 60, (W // 2, 230), GOLD, outline=4)
+            text(s, f"Kanatix Arcade {fu[0]} yayınlandı. Devam etmek için güncellemen gerekiyor.", 24, (W // 2, 310), WHITE)
+            r = pygame.Rect(W // 2 - 190, 380, 380, 76)
+            pygame.draw.rect(s, (60, 26, 96), r, border_radius=16)
+            pygame.draw.rect(s, GOLD, r, 3, border_radius=16)
+            text(s, "GÜNCELLE", 36, r.center, WHITE)
+            text(s, "Dokununca yeni APK indirilir; indirdikten sonra dosyayı açıp kur.", 18, (W // 2, 490), (190, 180, 220))
         status = getattr(self.app, "update_status", None)
         if status:
             pygame.draw.rect(s, (20, 10, 40), (0, 0, W, 34))
@@ -147,18 +165,27 @@ class Settings(Scene):
             ("Müzik", f"{int(st.get('music', 0.5) * 100)}%"),
             ("Bilgisayar Zorluğu", diff),
             ("Tam Ekran", "AÇIK" if st.get("fullscreen") else "KAPALI"),
+            ("Dokunmatik Kontroller", {"auto": "OTOMATİK", "on": "AÇIK", "off": "KAPALI"}[st.get("touch", "auto")]),
             ("Geri", ""),
         ]
 
     def handle(self, e):
         st = self.app.save.settings
+        if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+            for idx in range(len(self.rows())):
+                if pygame.Rect(W // 2 - 300, 190 + idx * 70, 600, 58).collidepoint(e.pos):
+                    self.i = idx
+                    e = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN)
+                    break
+            else:
+                return
         if is_back(e):
             self.app.save.save()
             self.app.pop()
             return
         d = nav_dir(e)
         if d and d[1]:
-            self.i = (self.i + d[1]) % 5
+            self.i = (self.i + d[1]) % 6
             self.app.audio.play("menu")
         elif (d and d[0]) or is_confirm(e):
             dx = d[0] if d and d[0] else 1
@@ -173,7 +200,13 @@ class Settings(Scene):
                 self.app.audio.play("menu")
             elif self.i == 3:
                 self.app.toggle_fullscreen()
-            elif self.i == 4 and is_confirm(e):
+            elif self.i == 4:
+                order = ["auto", "on", "off"]
+                st["touch"] = order[(order.index(st.get("touch", "auto")) + dx) % 3]
+                from engine.touch import is_android
+                self.app.touch_mode = st["touch"] == "on" or (st["touch"] == "auto" and is_android())
+                self.app.audio.play("menu")
+            elif self.i == 5 and is_confirm(e):
                 self.app.save.save()
                 self.app.pop()
             self.app.save.save()
@@ -182,7 +215,7 @@ class Settings(Scene):
         s.blit(self.bg, (0, 0))
         text(s, "AYARLAR", 64, (W // 2, 110), GOLD, outline=4)
         for idx, (k, v) in enumerate(self.rows()):
-            r = pygame.Rect(W // 2 - 300, 210 + idx * 76, 600, 60)
+            r = pygame.Rect(W // 2 - 300, 190 + idx * 70, 600, 58)
             sel = idx == self.i
             pygame.draw.rect(s, (60, 26, 96) if sel else (24, 14, 40), r, border_radius=14)
             if sel:

@@ -11,11 +11,13 @@ MAX_METER = 200
 
 
 class InputState:
-    __slots__ = ("left", "right", "up", "down", "p", "k", "p_held", "k_held")
+    __slots__ = ("left", "right", "up", "down", "p", "k", "p_held", "k_held", "special")
 
-    def __init__(self, left=False, right=False, up=False, down=False, p=False, k=False, p_held=False, k_held=False):
+    def __init__(self, left=False, right=False, up=False, down=False, p=False, k=False, p_held=False, k_held=False,
+                 special=None):
         self.left, self.right, self.up, self.down = left, right, up, down
         self.p, self.k, self.p_held, self.k_held = p, k, p_held, k_held
+        self.special = special   # dokunmatik özel hareket tuşu: 0,1,2 ya da "super"
 
 
 def numpad(inp, facing):
@@ -86,6 +88,8 @@ class Fighter:
         self.ko_pending = False
         self.low_hit = False
         self.proj_out = False
+        self.back_block_pose = False
+        self.stun0 = 1
 
     # ------------------------------------------------------------------ yardımcılar
     @property
@@ -120,7 +124,14 @@ class Fighter:
             self.buffer.append((self.frame, n))
             if len(self.buffer) > 32:
                 self.buffer.pop(0)
-        if inp.p:
+        if inp.special is not None:
+            sp = self.ch["super"] if inp.special == "super" else self.ch["specials"][inp.special]
+            # tek tuşla özel hareket: komutu girdi geçmişine ekle
+            for d in MOTIONS[sp["motion"]]:
+                self.buffer.append((self.frame, d))
+            self.buffer = self.buffer[-32:]
+            self.press_buf = (sp["button"], self.frame)
+        elif inp.p:
             self.press_buf = ("P", self.frame)
         elif inp.k:
             self.press_buf = ("K", self.frame)
@@ -289,6 +300,7 @@ class Fighter:
             self.y = min(self.y, GROUND - 1)
         else:
             self.stun = hd["hitstun"]
+            self.stun0 = self.stun
             self.low_hit = hd["height"] == "low" or self.input.down
             self.set_state("hitstun")
             self.vx = d * hd["push"]
@@ -303,7 +315,7 @@ class Fighter:
         if a.kind == "normal":
             s, act = d["s"], d["a"]
             if s <= a.t < s + act and a.hits_done == 0:
-                p = limb_point(self.ch, self.pose, self.x, self.y, self.facing, d["limb"], self.draw_grounded())
+                p = self.limb_pos(d["limb"])
                 hd = dict(dmg=int(d["dmg"] * self.ch["power"]), hitstun=d["hitstun"], block=d["block"], push=d["push"],
                           height=d["height"], knockdown=d.get("knockdown"), chip=0.0, snd=d["snd"],
                           strength=1 if d["dmg"] < 70 else 2)
@@ -320,7 +332,7 @@ class Fighter:
             if a.t - a.last_hit_t < 6:
                 return None
             hd = dict(base, launch=-11.0, knockdown=a.hits_done == hits - 1)
-            p = limb_point(self.ch, self.pose, self.x, self.y, self.facing, d["limb"], self.draw_grounded())
+            p = self.limb_pos(d["limb"])
             return p, 30 * self.ch["scale"], hd
         if typ == "dash" and a.phase == "active":
             gap = max(4, d["dur"] // hits)
@@ -329,11 +341,11 @@ class Fighter:
             last = a.hits_done == hits - 1
             hd = dict(base, push=2.0 if not last else 7.0, knockdown=last and (a.kind == "super" or d.get("armor")),
                       hitstun=24)
-            p = limb_point(self.ch, self.pose, self.x, self.y, self.facing, d["limb"], self.draw_grounded())
+            p = self.limb_pos(d["limb"])
             return p, 34 * self.ch["scale"], hd
         if typ == "stomp" and a.phase == "active" and self.vy > 0:
             hd = dict(base, height="high", knockdown=True, launch=-9.0)
-            p = limb_point(self.ch, self.pose, self.x, self.y, self.facing, d["limb"], self.draw_grounded())
+            p = self.limb_pos(d["limb"])
             return p, 34 * self.ch["scale"], hd
         return None
 
@@ -347,7 +359,17 @@ class Fighter:
     def draw_grounded(self):
         return self.grounded and self.state not in ("air_hit",)
 
+    def limb_pos(self, limb, pose=None, grounded=None):
+        if self.ch.get("sprite"):
+            from games.fighter import sprites
+            return sprites.attack_point(self)
+        return limb_point(self.ch, pose or self.pose, self.x, self.y, self.facing, limb,
+                          self.draw_grounded() if grounded is None else grounded)
+
     def hurtbox(self):
+        if self.ch.get("sprite"):
+            from games.fighter import sprites
+            return sprites.hurt_rect(self)
         return hurt_rect(self.ch, self.pose, self.x, self.y, self.facing, self.draw_grounded())
 
     # ------------------------------------------------------------------ güncelleme
@@ -413,7 +435,8 @@ class Fighter:
                 target = self.idle_pose()
             if target is None:
                 target = self.idle_pose()
-            if self.back_held(opp) and opp.is_threatening() and self.state != "jump":
+            self.back_block_pose = self.back_held(opp) and opp.is_threatening() and self.state != "jump"
+            if self.back_block_pose:
                 target = POSES["cblock"] if inp.down else POSES["block"]
 
         elif st == "jump":
@@ -588,7 +611,7 @@ class Fighter:
                 a.phase = "active"
                 a.t_active = 0
                 if typ == "projectile":
-                    hand = limb_point(self.ch, p1, self.x, self.y, self.facing, "hand_f", True)
+                    hand = self.limb_pos("hand_f", p1, True)
                     self.emit("projectile", d, hand, a.kind == "super")
                     self.emit("sound", "fireball")
                     a.phase = "recovery"
@@ -616,7 +639,7 @@ class Fighter:
                 if self.vy > 0:
                     pose = blend(p1, POSES["jump"], min(1, self.vy / 8))
                 if a.t % 2 == 0:
-                    self.emit("trail", limb_point(self.ch, pose, self.x, self.y, self.facing, d["limb"], False), self.ch["fx"])
+                    self.emit("trail", self.limb_pos(d["limb"], pose, False), self.ch["fx"])
                 return pose
             if typ == "dash":
                 a.timer -= 1
@@ -626,7 +649,7 @@ class Fighter:
                 else:
                     pose = dict(p1)
                 if a.t % 2 == 0:
-                    self.emit("trail", limb_point(self.ch, pose, self.x, self.y, self.facing, d["limb"], self.draw_grounded()),
+                    self.emit("trail", self.limb_pos(d["limb"], pose),
                               self.ch["fx"])
                 if d.get("armor"):
                     self.invuln = max(self.invuln, 1) if a.kind == "super" else self.invuln

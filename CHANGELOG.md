@@ -1,5 +1,17 @@
 # Sürüm Günlüğü
 
+## v1.1.0 (2026-11-06)
+**Neden:** Görseller zayıf bulundu, oyun takılıyordu, özel hareketler ekranda görünmüyordu ve telefon (APK) sürümü istendi.
+
+- 4 yeni çizimli karakter: Daiki, Jax, Kaito, Titus (StreetFighter2D-Game reposundan, MIT lisansı; kaynak gösterildi)
+- 3 yeni resimli arena: Ejder Kalesi (kıvılcımlar), Neon Çatı (yağmur), Gece Metrosu (yağmur)
+- Takılma düzeltmeleri: müzik açılışta arka planda hazırlanıyor, ışık efektleri önbellekte tutuluyor, süper/nakavt duraklamaları kısaldı
+- Dövüş sırasında ekranda özel hareket listesi (TAB ile aç/kapa), karakter seçiminde de komutlar görünüyor
+- Yeni 4'lü zincir: Yumruk → Yumruk → Tekme → Tekme → özel hareket → Süper (Ustalık Kombosu)
+- Windows'ta oklar kutu olarak görünüyordu: oklar artık çiziliyor, Türkçe karakterli yazı tipi oyuna gömüldü
+- Android APK: solda yön çemberi, sağda Yumruk / Tekme, her özel hareket ve süper için tek dokunuşluk tuşlar
+- Mini oyunlara dokunmatik kontrol, telefonda zorunlu güncelleme ekranı
+
 ## v1.0.0 (2026-11-06)
 **Neden:** İlk sürüm. Klasik atari oyunlarını tek bir Kanatix uygulamasında toplamak için hazırlandı.
 

@@ -6,7 +6,7 @@ import sys
 
 import pygame
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 TITLE = "Kanatix Arcade"
 W, H = 1280, 720
 FPS = 60
@@ -29,12 +29,18 @@ def resource_path(*parts):
 
 
 def data_dir():
-    if os.name == "nt":
+    if os.environ.get("ANDROID_PRIVATE"):
+        root = os.environ["ANDROID_PRIVATE"]
+    elif os.name == "nt":
         root = os.environ.get("APPDATA", os.path.expanduser("~"))
     else:
         root = os.path.join(os.path.expanduser("~"), ".local", "share")
     path = os.path.join(root, "KanatixArcade")
-    os.makedirs(path, exist_ok=True)
+    try:
+        os.makedirs(path, exist_ok=True)
+    except OSError:
+        import tempfile
+        path = tempfile.gettempdir()
     return path
 
 
@@ -81,7 +87,11 @@ def font(size, bold=True):
     key = (size, bold)
     if key not in _font_cache:
         f = None
-        for name in ("bahnschrift", "segoeuisemibold", "segoeui", "arialblack", "arial"):
+        try:
+            f = pygame.font.Font(resource_path("assets", "fonts", "DejaVuSansCondensed-Bold.ttf"), int(size * 0.95))
+        except Exception:
+            f = None
+        for name in (() if f else ("bahnschrift", "segoeuisemibold", "segoeui", "arialblack", "arial")):
             try:
                 path = pygame.font.match_font(name, bold=bold)
                 if path:
@@ -96,18 +106,92 @@ def font(size, bold=True):
     return _font_cache[key]
 
 
+# Her yazı tipinde bulunmayan semboller: bunları kendimiz çiziyoruz (Windows'ta kutu çıkmasın)
+ICON_ANGLES = {"→": 0, "↘": 45, "↓": 90, "↙": 135, "←": 180, "↖": 225, "↑": 270, "↗": 315, "►": 0, "◄": 180}
+ICONS = set(ICON_ANGLES) | {"↔", "♥"}
+
+
+def _draw_icon(surf, ch, rect, color):
+    cx, cy = rect.center
+    s = rect.h * 0.36
+    if ch == "♥":
+        r = s * 0.55
+        pygame.draw.circle(surf, color, (int(cx - r * 0.9), int(cy - r * 0.4)), int(r))
+        pygame.draw.circle(surf, color, (int(cx + r * 0.9), int(cy - r * 0.4)), int(r))
+        pygame.draw.polygon(surf, color, [(cx - r * 1.85, cy - r * 0.2), (cx + r * 1.85, cy - r * 0.2), (cx, cy + s * 0.95)])
+        return
+    if ch == "↔":
+        for a in (0, 180):
+            _draw_arrow(surf, cx + (s * 0.45 if a == 0 else -s * 0.45), cy, s * 0.75, a, color, shaft=False)
+        pygame.draw.line(surf, color, (cx - s * 0.8, cy), (cx + s * 0.8, cy), max(2, int(s * 0.32)))
+        return
+    if ch in ("►", "◄"):
+        a = math.radians(ICON_ANGLES[ch])
+        pts = [(cx + math.cos(a) * s, cy), (cx - math.cos(a) * s * 0.7, cy - s * 0.85), (cx - math.cos(a) * s * 0.7, cy + s * 0.85)]
+        pygame.draw.polygon(surf, color, pts)
+        return
+    _draw_arrow(surf, cx, cy, s, ICON_ANGLES[ch], color)
+
+
+def _draw_arrow(surf, cx, cy, s, deg, color, shaft=True):
+    a = math.radians(deg)
+    dx, dy = math.cos(a), math.sin(a)
+    nx, ny = -dy, dx
+    tip = (cx + dx * s, cy + dy * s)
+    back = (cx - dx * s, cy - dy * s)
+    head = s * 0.75
+    hb = (tip[0] - dx * head, tip[1] - dy * head)
+    if shaft:
+        pygame.draw.line(surf, color, back, hb, max(2, int(s * 0.34)))
+    pygame.draw.polygon(surf, color, [tip, (hb[0] + nx * head * 0.75, hb[1] + ny * head * 0.75),
+                                      (hb[0] - nx * head * 0.75, hb[1] - ny * head * 0.75)])
+
+
+def render_rich(f, msg, color):
+    """Yazıyı çizer; ok gibi sembolleri yazı tipinden değil, şekil olarak çizer."""
+    msg = str(msg)
+    if not any(c in ICONS for c in msg):
+        return f.render(msg, True, color)
+    h = f.get_height()
+    icon_w = int(h * 0.85)
+    parts = []
+    buf = ""
+    for c in msg:
+        if c in ICONS:
+            if buf:
+                parts.append(("t", buf))
+                buf = ""
+            parts.append(("i", c))
+        else:
+            buf += c
+    if buf:
+        parts.append(("t", buf))
+    imgs = [(k, f.render(v, True, color) if k == "t" else v) for k, v in parts]
+    width = sum(img.get_width() if k == "t" else icon_w for k, img in imgs)
+    out = pygame.Surface((max(1, width), h), pygame.SRCALPHA)
+    x = 0
+    for k, img in imgs:
+        if k == "t":
+            out.blit(img, (x, 0))
+            x += img.get_width()
+        else:
+            _draw_icon(out, img, pygame.Rect(x, 0, icon_w, h), color)
+            x += icon_w
+    return out
+
+
 def text(surf, msg, size, pos, color=WHITE, anchor="center", shadow=True, outline=0, ocolor=BLACK, alpha=255):
     f = font(size)
-    img = f.render(str(msg), True, color)
+    img = render_rich(f, msg, color)
     rect = img.get_rect(**{anchor: pos})
     if outline:
-        o = f.render(str(msg), True, ocolor)
+        o = render_rich(f, msg, ocolor)
         for dx in range(-outline, outline + 1, max(1, outline)):
             for dy in range(-outline, outline + 1, max(1, outline)):
                 if dx or dy:
                     surf.blit(o, rect.move(dx, dy))
     elif shadow:
-        s = f.render(str(msg), True, (0, 0, 0))
+        s = render_rich(f, msg, (0, 0, 0))
         s.set_alpha(min(160, alpha))
         surf.blit(s, rect.move(3, 3))
     if alpha < 255:
@@ -153,12 +237,17 @@ _glow_cache = {}
 
 
 def blit_glow(surf, pos, radius, color, intensity=1.0):
-    key = (int(radius), tuple(color), round(intensity, 2))
+    # renk ve yarıçapı kademelendir: önbellek tutsun, her karede yeniden üretilmesin (takılmayı önler)
+    radius = max(4, (int(radius) + 3) // 4 * 4)
+    color = tuple(min(255, (int(c * intensity) + 7) // 16 * 16) for c in color[:3])
+    if not any(color):
+        return
+    key = (radius, color)
     g = _glow_cache.get(key)
     if g is None:
-        if len(_glow_cache) > 300:
+        if len(_glow_cache) > 900:
             _glow_cache.clear()
-        g = glow_circle(int(radius), color, intensity)
+        g = glow_circle(radius, color, 1.0)
         _glow_cache[key] = g
     surf.blit(g, (pos[0] - radius, pos[1] - radius), special_flags=pygame.BLEND_ADD)
 
@@ -207,8 +296,12 @@ class App:
         except Exception:
             pass
         self.save = Save()
-        flags = pygame.SCALED | pygame.RESIZABLE
-        self.screen = pygame.display.set_mode((W, H), flags, vsync=1)
+        from engine.touch import is_android
+        flags = pygame.SCALED | (pygame.FULLSCREEN if is_android() else pygame.RESIZABLE)
+        try:
+            self.screen = pygame.display.set_mode((W, H), flags, vsync=1)
+        except Exception:
+            self.screen = pygame.display.set_mode((W, H), flags)
         if self.save.settings.get("fullscreen"):
             try:
                 pygame.display.toggle_fullscreen()
@@ -222,6 +315,10 @@ class App:
         self.time = 0.0
         self.joysticks = []
         self.update_status = None
+        from engine.touch import is_android
+        self.android = is_android()
+        st = self.save.settings
+        self.touch_mode = st.get("touch", "auto") == "on" or (st.get("touch", "auto") == "auto" and self.android)
         self._init_joysticks()
 
     def _init_joysticks(self):
@@ -291,7 +388,7 @@ def is_confirm(event):
 
 
 def is_back(event):
-    return (event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE)) or \
+    return (event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE, pygame.K_AC_BACK)) or \
         (event.type == pygame.JOYBUTTONDOWN and event.button in (1, 6, 8))
 
 

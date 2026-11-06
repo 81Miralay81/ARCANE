@@ -55,7 +55,8 @@ class BreakoutGame(ArcadeGame):
             self.app.audio.play("bounce")
 
     def play_event(self, e):
-        if (e.type == pygame.KEYDOWN and e.key in (pygame.K_SPACE, pygame.K_UP, pygame.K_w)) or \
+        if (e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 and not self.PAUSE_RECT.collidepoint(e.pos)) or \
+                (e.type == pygame.KEYDOWN and e.key in (pygame.K_SPACE, pygame.K_UP, pygame.K_w)) or \
                 (e.type == pygame.JOYBUTTONDOWN and e.button == 0):
             self.launch()
 
@@ -72,6 +73,9 @@ class BreakoutGame(ArcadeGame):
             except Exception:
                 pass
         self.paddle.x += int(dx * 11)
+        if pygame.mouse.get_pressed()[0]:
+            mx = pygame.mouse.get_pos()[0]
+            self.paddle.centerx += int(max(-16, min(16, (mx - self.paddle.centerx) * 0.35)))
         if self.wide_t > 0:
             self.wide_t -= dt
             target = 220

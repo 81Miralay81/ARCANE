@@ -116,6 +116,7 @@ class Audio:
             self.ok = True
             pygame.mixer.set_num_channels(24)
             self._build()
+            self.prebuild_music()
         except Exception:
             self.ok = False
 
@@ -171,15 +172,33 @@ class Audio:
             if ch:
                 ch.set_volume(self.settings.get("volume", 0.7) * vol)
 
+    def prebuild_music(self):
+        """Müzikleri arka planda önceden üret (oyun içinde takılma olmasın)."""
+        import threading
+
+        def work():
+            for name, spec in self._music_specs.items():
+                if name not in self.music:
+                    try:
+                        self.music[name] = self._snd(make_music(**spec))
+                    except Exception:
+                        pass
+                    if self._pending == name:
+                        self._pending = None
+                        self.play_music(name)
+        if self.ok:
+            threading.Thread(target=work, daemon=True).start()
+
+    _pending = None
+
     def play_music(self, name):
         if not self.ok or self.current == name:
             return
         self.stop_music()
         if name not in self.music:
-            spec = self._music_specs.get(name)
-            if not spec:
-                return
-            self.music[name] = self._snd(make_music(**spec))
+            # henüz hazır değil: hazır olunca çalacak
+            self._pending = name
+            return
         self.current = name
         self.music_channel = self.music[name].play(loops=-1)
         if self.music_channel:

@@ -52,9 +52,23 @@ class ArcadeGame(Scene):
         self.new_best = self.app.save.submit(self.key, self.score)
         self.app.audio.play("lose")
 
+    PAUSE_RECT = pygame.Rect(W - 76, 56, 52, 44)
+
     def handle(self, e):
+        tap = e.pos if (e.type == pygame.MOUSEBUTTONDOWN and e.button == 1) else None
+        if self.state in ("pause", "over") and tap:
+            for i in range(2):
+                if pygame.Rect(W // 2 - 170, 380 + i * 70, 340, 54).collidepoint(tap):
+                    self.menu_i = i
+                    e = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN)
+                    break
+            else:
+                return
+        if self.state == "ready" and tap:
+            e = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN)
         if self.state == "play":
-            if (e.type == pygame.KEYDOWN and e.key in (pygame.K_ESCAPE, pygame.K_p)) or \
+            if (e.type == pygame.KEYDOWN and e.key in (pygame.K_ESCAPE, pygame.K_p, pygame.K_AC_BACK)) or \
+                    (tap and self.PAUSE_RECT.collidepoint(tap)) or \
                     (e.type == pygame.JOYBUTTONDOWN and e.button in (7, 9)):
                 self.state = "pause"
                 self.menu_i = 0
@@ -119,13 +133,19 @@ class ArcadeGame(Scene):
         best = max(self.app.save.best(self.key), self.score)
         text(s, f"SKOR  {self.score}", 30, (30, 30), WHITE, anchor="midleft", outline=2)
         text(s, f"REKOR  {best}", 24, (W - 30, 30), GOLD, anchor="midright", outline=2)
+        if self.state == "play":
+            r = self.PAUSE_RECT
+            pygame.draw.rect(s, (30, 20, 50), r, border_radius=10)
+            pygame.draw.rect(s, (200, 190, 230), r, 2, border_radius=10)
+            pygame.draw.rect(s, WHITE, (r.centerx - 9, r.y + 11, 6, 22))
+            pygame.draw.rect(s, WHITE, (r.centerx + 3, r.y + 11, 6, 22))
         if self.state == "ready":
             self._overlay(s, 150)
             text(s, self.title, 84, (W // 2, H // 2 - 90), GOLD, outline=4)
             for i, line in enumerate(self.help.split("\n")):
                 text(s, line, 24, (W // 2, H // 2 + i * 34), WHITE)
             if int(self.t * 2) % 2:
-                text(s, "Başlamak için bir tuşa bas", 26, (W // 2, H // 2 + 150), (120, 220, 255))
+                text(s, "Başlamak için bir tuşa bas ya da ekrana dokun", 26, (W // 2, H // 2 + 150), (120, 220, 255))
         elif self.state in ("pause", "over"):
             self._overlay(s, 170)
             if self.state == "pause":

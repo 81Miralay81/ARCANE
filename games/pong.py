@@ -51,6 +51,10 @@ class PongGame(ArcadeGame):
         except Exception:
             pass
         self.pl.y += int(dl * 10)
+        if pygame.mouse.get_pressed()[0]:
+            mx, my = pygame.mouse.get_pos()
+            if mx < W // 2:
+                self.pl.centery += int(max(-14, min(14, (my - self.pl.centery) * 0.4)))
         if self.human_r:
             self.pr.y += int(dr * 10)
         else:

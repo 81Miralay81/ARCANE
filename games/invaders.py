@@ -29,7 +29,7 @@ def make_sprite(shape, color, px=4):
 class InvadersGame(ArcadeGame):
     key = "uzay"
     title = "UZAY İSTİLASI"
-    help = "← → / A D hareket, BOŞLUK / F ateş\nİstilacıları yok et, kalkanların arkasına saklan\nKırmızı ana gemi = bonus puan"
+    help = "← → / A D hareket, BOŞLUK / F ateş (telefonda: parmağını sürükle)\nİstilacıları yok et, kalkanların arkasına saklan\nKırmızı ana gemi = bonus puan"
     bg_top = (2, 2, 14)
     bg_bottom = (10, 6, 34)
     grid_color = (30, 20, 70)
@@ -87,6 +87,11 @@ class InvadersGame(ArcadeGame):
                 shoot = shoot or j.get_button(0)
             except Exception:
                 pass
+        if pygame.mouse.get_pressed()[0]:
+            mx, my = pygame.mouse.get_pos()
+            if not self.PAUSE_RECT.collidepoint(mx, my):
+                dx = max(-1.0, min(1.0, (mx - self.ship_x) / 40))
+                shoot = True
         self.ship_x = max(40, min(W - 40, self.ship_x + dx * 7))
         self.cool -= 1
         if self.invuln > 0:

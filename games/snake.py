@@ -15,7 +15,7 @@ OY = 90
 class SnakeGame(ArcadeGame):
     key = "yilan"
     title = "NEON YILAN"
-    help = "Yön tuşları / WASD ile yönlendir\nElmaları ye, büyü, kendine ve duvara çarpma\nAltın elma = 5 puan + hız"
+    help = "Yön tuşları / WASD ya da parmağını kaydırarak yönlendir\nElmaları ye, büyü, kendine ve duvara çarpma\nAltın elma = 5 puan + hız"
     grid_color = (20, 60, 50)
     bg_top = (5, 18, 20)
     bg_bottom = (10, 30, 40)
@@ -43,10 +43,25 @@ class SnakeGame(ArcadeGame):
 
     def play_event(self, e):
         m = None
+        if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+            self.swipe = e.pos
+        elif e.type == pygame.MOUSEBUTTONUP and e.button == 1 and getattr(self, "swipe", None):
+            dx, dy = e.pos[0] - self.swipe[0], e.pos[1] - self.swipe[1]
+            if max(abs(dx), abs(dy)) < 30:
+                # dokunma: başa göre dokunulan yöne dön
+                hx, hy = self.cell_center(self.body[0])
+                dx, dy = e.pos[0] - hx, e.pos[1] - hy
+                if self.dir[0]:
+                    m = (0, 1 if dy > 0 else -1)
+                else:
+                    m = (1 if dx > 0 else -1, 0)
+            else:
+                m = ((1 if dx > 0 else -1), 0) if abs(dx) > abs(dy) else (0, (1 if dy > 0 else -1))
+            self.swipe = None
         if e.type == pygame.KEYDOWN:
             m = {pygame.K_UP: (0, -1), pygame.K_w: (0, -1), pygame.K_DOWN: (0, 1), pygame.K_s: (0, 1),
                  pygame.K_LEFT: (-1, 0), pygame.K_a: (-1, 0), pygame.K_RIGHT: (1, 0), pygame.K_d: (1, 0)}.get(e.key)
-        elif e.type == pygame.JOYHATMOTION and e.value != (0, 0):
+        if e.type == pygame.JOYHATMOTION and e.value != (0, 0):
             m = (e.value[0], -e.value[1]) if e.value[0] == 0 or e.value[1] == 0 else None
         if m:
             last = self.queue[-1] if self.queue else self.dir

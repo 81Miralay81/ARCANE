@@ -1,7 +1,7 @@
-name: Build EXE
+name: Build EXE + APK
 
-# main dalına her gönderimde exe derlenir ve engine/core.py içindeki
-# VERSION numarasıyla (örn. v1.0.0) Releases sayfasına yüklenir.
+# main dalına her gönderimde Windows exe ve Android APK derlenir,
+# engine/core.py içindeki VERSION numarasıyla (örn. v1.1.0) Releases sayfasına yüklenir.
 on:
   push:
     branches: [main]
@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  exe:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,10 +28,9 @@ jobs:
           pip install -r requirements.txt pyinstaller
       - name: EXE derle
         run: pyinstaller --noconfirm --onefile --windowed --name KanatixArcade --icon assets/icon.ico --add-data "assets;assets" main.py
-      - name: Artifact yukle
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: KanatixArcade-v${{ steps.ver.outputs.version }}
+          name: KanatixArcade-exe-v${{ steps.ver.outputs.version }}
           path: dist/KanatixArcade.exe
       - name: Release olustur / guncelle
         uses: softprops/action-gh-release@v2
@@ -42,3 +41,44 @@ jobs:
           files: dist/KanatixArcade.exe
           body_path: CHANGELOG.md
           make_latest: true
+
+  apk:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Surum numarasini oku
+        id: ver
+        run: echo "version=$(grep -oP '^VERSION = \"\K[^\"]+' engine/core.py)" >> "$GITHUB_OUTPUT"
+      - name: Buildozer onbellegi
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            .buildozer
+          key: buildozer-${{ hashFiles('buildozer.spec') }}
+      - name: Sistem paketleri
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev automake
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Buildozer kur
+        run: pip install --upgrade buildozer cython==0.29.36 setuptools
+      - name: APK derle
+        run: yes | buildozer -v android debug
+      - name: APK adini duzenle
+        run: cp bin/*.apk KanatixArcade.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KanatixArcade-apk-v${{ steps.ver.outputs.version }}
+          path: KanatixArcade.apk
+      - name: Release'e ekle
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: Kanatix Arcade v${{ steps.ver.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          files: KanatixArcade.apk
+          body_path: CHANGELOG.md

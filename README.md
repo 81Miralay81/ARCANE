@@ -2,14 +2,15 @@
 
 ![Kanatix](assets/icon.png)
 
-Retro atari salonu derlemesi. Tek bir `.exe` dosyası, kurulum gerektirmez.
-Tüm karakterler, grafikler, müzikler ve sesler bu projeye özgüdür ve kodla üretilir. Dışarıdan alınmış hiçbir oyun dosyası kullanılmaz.
+Retro atari salonu derlemesi. Windows için tek `.exe`, Android için `.apk`.
+
+İndir: **Releases** sayfasından `KanatixArcade.exe` (Windows) veya `KanatixArcade.apk` (Android).
 
 ## Oyunlar
 
 | Oyun | Açıklama |
 |------|----------|
-| **Dövüş Arenası** | 3 özgün dövüşçü, özel hareketler, süper hareketler, kombolar, 3 arena. 1P (bilgisayara karşı) veya 2P |
+| **Dövüş Arenası** | 7 dövüşçü (Daiki, Jax, Kaito, Titus, Kaan, Zeyna, Demir), özel ve süper hareketler, kombolar, 6 arena. 1P (bilgisayara karşı) veya 2P |
 | **Neon Yılan** | Klasik yılan oyunu, altın elmalar |
 | **Tuğla Kırıcı** | Seviyeler ve güçlendirmeler (geniş raket, çoklu top, ekstra can) |
 | **Uzay İstilası** | Dalga dalga gelen uzaylılar, kalkanlar, bonus ana gemi |
@@ -27,6 +28,11 @@ Tek oyunculu modda iki tuş takımı da 1. oyuncuyu kontrol eder. Gamepad de des
 
 - **Blok:** Geri yöne bas. Alçak saldırılara karşı **↓ + geri** bas.
 - **ESC:** Duraklatma menüsünü açar. Menüde tüm karakterlerin **hareket listesi** var.
+- **TAB:** Dövüş sırasında ekrandaki özel hareket listesini açar/kapatır.
+
+### Telefonda (APK)
+Solda **yön çemberi**, sağda **YUMRUK** ve **TEKME** tuşları var. Her özel hareketin ve **SÜPER**'in kendi tuşu da var; tek dokunuşla çıkar (komut girmeye gerek yok). Süper barı dolunca SÜPER tuşu parlar. Ortadaki **II** tuşu oyunu duraklatır.
+Bilgisayarda da dokunmatik ekran varsa **Ayarlar → Dokunmatik Kontroller → AÇIK** ile kullanılabilir.
 - **F11:** Tam ekran.
 
 ### Özel hareketler (karakter sağa bakarken)
@@ -50,6 +56,7 @@ Tek oyunculu modda iki tuş takımı da 1. oyuncuyu kontrol eder. Gamepad de des
 - **SÜPER: Dağ Devrilmesi:** ↓ ↘ → ↓ ↘ → + Yumruk
 
 ### Kombolar
+- **Ustalık kombosu:** Yumruk → Yumruk → Tekme → Tekme → özel hareket → Süper
 - **Zincir:** Yumruk → Yumruk → Tekme (3 vuruş, yere serer)
 - **Alçak zincir:** ↓+Yumruk → ↓+Yumruk → ↓+Tekme (süpürme)
 - **İptal kombosu:** Yumruk → Yumruk → hemen bir özel hareket komutu
@@ -57,6 +64,14 @@ Tek oyunculu modda iki tuş takımı da 1. oyuncuyu kontrol eder. Gamepad de des
 - **Hava kombosu:** Zıpla + Tekme → yere inince Yumruk → Yumruk → özel hareket
 
 Süper barı vurdukça ve vuruş yedikçe dolar. Her dolu bölüm bir süper hareket hakkı verir.
+
+## Telif ve kaynaklar
+
+- **Daiki, Jax, Kaito, Titus** karakter çizimleri ve **Ejder Kalesi, Neon Çatı, Gece Metrosu** arka planları:
+  [StreetFighter2D-Game](https://github.com/sujalvk888/StreetFighter2D-Game), Sujal V Kanchan, **MIT lisansı**.
+  Lisans metni: `assets/LICENSE-StreetFighter2D-Game.txt`. Dönüştürme aracı: `tools/import_repo_assets.py`
+- **Kaan, Zeyna, Demir**, Boğaz / Kapadokya / Gece Çarşısı arenaları, mini oyunlar, müzik ve sesler bu projeye özgüdür ve kodla üretilir.
+- Yazı tipi: DejaVu Sans (serbest lisans, `assets/fonts/LICENSE-DejaVu.txt`).
 
 ## Çalıştırma (kaynak koddan)
 
@@ -69,7 +84,7 @@ python main.py
 
 **Kendi bilgisayarında:** `build_exe.bat` dosyasına çift tıkla. Exe `dist\KanatixArcade.exe` konumunda oluşur.
 
-**GitHub üzerinden (otomatik):** `main` dalına her gönderimde (push) GitHub Actions exe'yi derler. Exe, `engine/core.py` içindeki `VERSION` numarasıyla **Releases** sayfasına yüklenir (örn. `v1.0.0`). Elle başlatmak için **Actions → Build EXE → Run workflow** seçeneğini kullan.
+**GitHub üzerinden (otomatik):** `main` dalına her gönderimde (push) GitHub Actions hem Windows exe'yi hem Android APK'yı derler. İkisi de `engine/core.py` içindeki `VERSION` numarasıyla **Releases** sayfasına yüklenir (örn. `v1.1.0`). APK derlemesi Buildozer ile yapılır ve 20-40 dakika sürebilir. Ayarları `buildozer.spec` dosyasındadır.
 
 ## Otomatik güncelleme
 
@@ -79,7 +94,7 @@ Repo adı `engine/updater.py` içindeki `GITHUB_REPO` satırında yazılıdır. 
 Yeni sürüm çıkarmak için:
 1. `engine/core.py` içindeki `VERSION` değerini artır (örn. `1.0.1`)
 2. `CHANGELOG.md` dosyasına ne değiştiğini ve nedenini yaz
-3. `main` dalına gönder (push). Exe derlenir, yeni sürüm Releases'a çıkar ve açık olan oyunlar kendini günceller.
+3. `main` dalına gönder (push). Exe ve APK derlenir, yeni sürüm Releases'a çıkar ve açık olan oyunlar kendini günceller (telefonda güncelleme ekranı çıkar).
 
 ## Ayarlar ve rekorlar
 

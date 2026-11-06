@@ -515,3 +515,90 @@ class NightMarketStage(Stage):
 
 
 STAGES = [BosphorusStage, CappadociaStage, NightMarketStage]
+
+
+# ============================================================================ resimli arenalar
+class ImageStage(Stage):
+    """StreetFighter2D-Game reposundan (MIT) alınan boyalı arka planlar + canlı efektler."""
+    file = ""
+    effect = "embers"
+    tint = (255, 140, 60)
+
+    def build(self):
+        from engine.core import resource_path
+        rnd = random.Random(self.file)
+        try:
+            img = pygame.image.load(resource_path("assets", "stages", self.file)).convert()
+        except Exception:
+            img = pygame.Surface((1500, 844))
+            img.fill((30, 20, 40))
+        h = 790
+        w = int(img.get_width() * h / img.get_height())
+        self.bg = pygame.transform.smoothscale(img, (w, h))
+        self.k = (w - W) / max(1, STAGE_W - W)
+        self.parts = [[rnd.uniform(0, W), rnd.uniform(0, H), rnd.uniform(0.3, 1.0)] for _ in range(90)]
+        self.crowd = None
+
+    def draw_back(self, surf, camx):
+        surf.blit(self.bg, (-int(camx * self.k), -40))
+        t = self.t
+        if self.effect == "embers":
+            for p in self.parts:
+                p[1] -= 0.8 * p[2]
+                p[0] += math.sin(t * 2 + p[2] * 9) * 0.5
+                if p[1] < -10:
+                    p[1] = H + 10
+                    p[0] = random.uniform(0, W)
+                r = 2 + int(p[2] * 2)
+                blit_glow(surf, (int(p[0]), int(p[1])), r * 4, (int(120 * p[2]), int(50 * p[2]), 10), 1.0)
+                pygame.draw.circle(surf, (255, 190, 90), (int(p[0]), int(p[1])), r)
+            for tx in (0.18, 0.82):
+                x = int(W * tx - camx * self.k * 0.2)
+                blit_glow(surf, (x, 470), 160 + int(math.sin(t * 9 + tx * 10) * 12), (90, 40, 10), 1.0)
+        elif self.effect == "rain":
+            for p in self.parts:
+                p[1] += 16 * p[2] + 6
+                p[0] -= 3 * p[2]
+                if p[1] > H:
+                    p[1] = random.uniform(-80, 0)
+                    p[0] = random.uniform(0, W + 100)
+                c = (int(120 + 80 * p[2]), int(140 + 80 * p[2]), 200)
+                pygame.draw.line(surf, c, (p[0], p[1]), (p[0] - 4 * p[2], p[1] - 22 * p[2]), 1)
+            # neon titremesi
+            if int(t * 7) % 23 == 0:
+                fl = pygame.Surface((W, H), pygame.SRCALPHA)
+                fl.fill(self.tint + (18,))
+                surf.blit(fl, (0, 0))
+        g = pygame.Surface((W, 140), pygame.SRCALPHA)
+        for i in range(140):
+            pygame.draw.line(g, (0, 0, 0, int(120 * (i / 140) ** 1.5)), (0, i), (W, i))
+        surf.blit(g, (0, H - 140))
+        # zemin parlaması (yansıma)
+        gl = pygame.Surface((W, 60), pygame.SRCALPHA)
+        for i in range(60):
+            pygame.draw.line(gl, self.tint + (int(30 * (1 - i / 60)),), (0, i), (W, i))
+        surf.blit(gl, (0, FLOOR_TOP + 20))
+
+
+class FortressStage(ImageStage):
+    name = "Ejder Kalesi"
+    file = "stage1.jpg"
+    effect = "embers"
+    tint = (255, 140, 60)
+
+
+class RooftopStage(ImageStage):
+    name = "Neon Çatı"
+    file = "stage2.jpg"
+    effect = "rain"
+    tint = (255, 60, 120)
+
+
+class MetroStage(ImageStage):
+    name = "Gece Metrosu"
+    file = "stage3.jpg"
+    effect = "rain"
+    tint = (90, 160, 255)
+
+
+STAGES = [FortressStage, RooftopStage, MetroStage] + STAGES

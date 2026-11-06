@@ -15,9 +15,10 @@ KEYMAP_SOLO = {key: KEYMAPS[0][key] + KEYMAPS[1][key] for key in KEYMAPS[0]}
 
 
 class HumanController:
-    def __init__(self, keymap, joystick=None):
+    def __init__(self, keymap, joystick=None, touch=None):
         self.map = keymap
         self.joy = joystick
+        self.touch = touch
         self.prev_p = False
         self.prev_k = False
 
@@ -48,7 +49,22 @@ class HumanController:
                 k |= any(self.joy.get_button(b) for b in (1, 3) if b < nb)
             except Exception:
                 pass
-        inp = InputState(left, right, up, down, p and not self.prev_p, k and not self.prev_k, p, k)
+        special = None
+        tp = tk = False
+        if self.touch is not None:
+            l2, r2, u2, d2 = self.touch.dirs()
+            left |= l2
+            right |= r2
+            up |= u2
+            down |= d2
+            tp = self.touch.take("P")
+            tk = self.touch.take("K")
+            for i in range(3):
+                if self.touch.take("S%d" % i):
+                    special = i
+            if self.touch.take("SUP"):
+                special = "super"
+        inp = InputState(left, right, up, down, (p and not self.prev_p) or tp, (k and not self.prev_k) or tk, p, k, special)
         self.prev_p, self.prev_k = p, k
         return inp
 
