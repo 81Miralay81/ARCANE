@@ -73,15 +73,8 @@ jobs:
           python-version: "3.11"
       - name: Buildozer kur
         run: pip install --upgrade buildozer cython==0.29.36 setuptools
-      - name: Apache Ant'i onceden indir (IPv4, tekrar denemeli)
-        run: |
-          mkdir -p ~/.buildozer/android/platform
-          cd ~/.buildozer/android/platform
-          if [ ! -d apache-ant-1.9.4 ]; then
-            curl -4 -fsSL --retry 6 --retry-delay 5 https://archive.apache.org/dist/ant/binaries/apache-ant-1.9.4-bin.tar.gz -o ant.tgz \
-              || curl -4 -fsSL --retry 6 --retry-delay 5 https://dlcdn.apache.org/ant/binaries/apache-ant-1.9.4-bin.tar.gz -o ant.tgz
-            tar xzf ant.tgz && rm ant.tgz
-          fi
+      - name: Apache Ant klasoru (Gradle kullanildigi icin Ant gerekmiyor, indirme atlanir)
+        run: mkdir -p ~/.buildozer/android/platform/apache-ant-1.9.4/bin
       - name: APK derle
         run: yes | buildozer -v android debug
       - name: APK adini duzenle
@@ -128,15 +121,8 @@ jobs:
             zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev automake
       - name: Buildozer kur
         run: pip install --upgrade buildozer cython==0.29.36 setuptools
-      - name: Apache Ant'i onceden indir (IPv4, tekrar denemeli)
-        run: |
-          mkdir -p ~/.buildozer/android/platform
-          cd ~/.buildozer/android/platform
-          if [ ! -d apache-ant-1.9.4 ]; then
-            curl -4 -fsSL --retry 6 --retry-delay 5 https://archive.apache.org/dist/ant/binaries/apache-ant-1.9.4-bin.tar.gz -o ant.tgz \
-              || curl -4 -fsSL --retry 6 --retry-delay 5 https://dlcdn.apache.org/ant/binaries/apache-ant-1.9.4-bin.tar.gz -o ant.tgz
-            tar xzf ant.tgz && rm ant.tgz
-          fi
+      - name: Apache Ant klasoru (Gradle kullanildigi icin Ant gerekmiyor, indirme atlanir)
+        run: mkdir -p ~/.buildozer/android/platform/apache-ant-1.9.4/bin
       - name: Emülatör için APK (x86_64)
         env:
           APP_ANDROID_ARCHS: x86_64
