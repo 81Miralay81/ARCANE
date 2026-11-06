@@ -1,5 +1,13 @@
 # Sürüm Günlüğü
 
+## v1.3.0 (2026-11-06)
+**Neden:** Aynı ağdaki iki bilgisayardan arkadaşla oynamak istendi.
+
+- YENİ: Ağda Oyna (LAN). Oyun Kur / Oyuna Katıl; aynı ağdaki oyunlar otomatik bulunur, IP ile de bağlanılabilir
+- Dövüş Arenası karşılıklı, Gölge Seferi birlikte (co-op: 2 kahraman, düşen arkadaş dalga bitince dirilir, ganimet paylaşılır), Neon Pong karşılıklı
+- Kilitli adımlı senkron: iki ekranda da birebir aynı oyun; senkron hatası olursa uyarı
+- Gölge Seferi oyun mantığı ayrı rastgele üreteçle çalışıyor (ağ oyunu için)
+
 ## v1.2.1 (2026-11-06)
 **Neden:** APK telefonda açılır açılmaz kapanıyordu; Windows güncellemesi %0'da kayboluyordu.
 

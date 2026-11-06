@@ -222,3 +222,13 @@ def key_names(two_player, side):
     if two_player and side == 0:
         return {"P": "F", "K": "G"}
     return {"P": "K", "K": "L"}
+
+
+class NetController:
+    """Ağ oyununda girdiler dışarıdan (kilitli adım) verilir."""
+
+    def __init__(self):
+        self.value = InputState()
+
+    def poll(self, fighter, opp, scene):
+        return self.value

@@ -12,6 +12,13 @@ ZMAX = 190              # derinlik aralığı
 GRAV = 0.95
 HERO_SCALE = 0.78
 
+# Oyun mantığı için ayrı rastgele üreteç: ağ oyununda iki bilgisayar aynı tohumla aynı sonucu üretir
+RNG = random.Random()
+
+
+def seed(n):
+    RNG.seed(n)
+
 _tint_cache = {}
 
 
@@ -222,8 +229,8 @@ class Hero(Entity):
         return 1 + 0.22 * (self.skill_level(i) - 1)
 
     def roll_dmg(self, mult):
-        crit = random.random() < self.crit
-        d = self.atk * mult * random.uniform(0.9, 1.1) * (1.8 if crit else 1.0)
+        crit = RNG.random() < self.crit
+        d = self.atk * mult * RNG.uniform(0.9, 1.1) * (1.8 if crit else 1.0)
         return int(d), crit
 
     def busy(self):
@@ -571,21 +578,28 @@ class Enemy(Entity):
         self.armor = data.get("armor", False) and not (kind == "dev" and False)
         self.xp = int(data["xp"] * mult * (2.5 if elite else 1))
         self.gold = int(data["gold"] * mult * (2.5 if elite else 1))
-        self.cd = random.uniform(0.5, 1.5)
+        self.cd = RNG.uniform(0.5, 1.5)
         self.token = False
         self.move = None
         self.hit_ids = set()
         self.phase2 = False
-        self.slot = random.choice((-1, 1))
-        self.zoff = random.uniform(-25, 25)
+        self.slot = RNG.choice((-1, 1))
+        self.zoff = RNG.uniform(-25, 25)
         self.aura = data.get("aura", (255, 200, 60) if elite else None)
 
     def update(self, dt, scene, xmin, xmax):
         self.t += dt
         self.flash = max(0, self.flash - dt)
         self.invuln = max(0, self.invuln - dt)
-        hero = scene.hero
+        hero = scene.target_for(self)
         st = self.state
+        if hero is None:
+            self.vx *= 0.8
+            self.vz *= 0.8
+            if st in ("walk", "windup"):
+                self.set_state("idle")
+            self.physics(dt, xmin, xmax)
+            return
         d = self.data
         if self.boss and not self.phase2 and self.hp < self.maxhp * 0.5:
             self.phase2 = True
@@ -663,7 +677,7 @@ class Enemy(Entity):
                 self.vx *= 0.8
             if self.t > (0.7 if self.move == "dash" else 0.4):
                 self.set_state("idle")
-                self.cd = d["cd"] * random.uniform(0.8, 1.3) * (0.65 if self.phase2 else 1.0)
+                self.cd = d["cd"] * RNG.uniform(0.8, 1.3) * (0.65 if self.phase2 else 1.0)
                 self.move = None
                 if not self.boss:
                     scene.release_token(self)
@@ -698,9 +712,9 @@ class Enemy(Entity):
     def choose_boss_move(self, scene, in_range):
         moves = list(self.data["moves"])
         if in_range:
-            self.move = random.choice(["melee", "melee"] + [m for m in moves if m in ("slam", "dash")])
+            self.move = RNG.choice(["melee", "melee"] + [m for m in moves if m in ("slam", "dash")])
         else:
-            self.move = random.choice(moves)
+            self.move = RNG.choice(moves)
         if self.move == "summon" and len(scene.enemies) > 4:
             self.move = "dash"
         self.set_state("windup")

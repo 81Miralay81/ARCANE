@@ -17,6 +17,18 @@ Retro atari salonu derlemesi. Windows için tek `.exe`, Android için `.apk`.
 | **Uzay İstilası** | Dalga dalga gelen uzaylılar, kalkanlar, bonus ana gemi |
 | **Neon Pong** | Bilgisayara ya da arkadaşına karşı |
 
+## Ağda oyna (LAN)
+
+Aynı modem / Wi-Fi'deki iki bilgisayarla oynanır.
+
+1. Bir bilgisayarda **Ağda Oyna → Oyun Kur** de ve modu seç (Dövüş Arenası, Gölge Seferi ya da Neon Pong).
+2. Diğer bilgisayarda **Ağda Oyna → Oyuna Katıl** de. Kurulan oyun listede çıkar, seçip ENTER'a bas.
+   Listede çıkmazsa kuran bilgisayarın ekranında yazan IP adresini **IP ile bağlan** satırına yaz.
+3. İkiniz de karakterini seçip ENTER ile **hazır** olun, oyun başlar. Herkes kendi klavyesiyle oynar (yön tuşları/WASD + K/L).
+
+Windows güvenlik duvarı izin isterse **Özel ağlar** için **İzin ver**'i seç. Kullanılan portlar: 47800 (UDP, oyun bulma) ve 47801 (TCP, oyun).
+Gölge Seferi'nde iki kahraman birlikte savaşır; düşen arkadaş dalga bitince dirilir, altın ve XP ikinize de yazılır.
+
 ## Gölge Seferi kontrolleri
 
 | Tuş | İşlev |

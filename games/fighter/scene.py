@@ -7,7 +7,7 @@ import pygame
 from engine.core import (BLACK, CYAN, GOLD, RED, WHITE, W, H, Particles, Scene, blit_glow, font, is_back, is_confirm,
                          lerp_color, nav_dir, shade, text, vgradient)
 from games.fighter.characters import CHARACTERS, MOTION_TEXT
-from games.fighter.controls import KEYMAP_SOLO, KEYMAPS, CPUController, HumanController, key_names
+from games.fighter.controls import KEYMAP_SOLO, KEYMAPS, CPUController, HumanController, NetController, key_names
 from games.fighter.fighter import GROUND, MAX_METER, SUPER_COST, Fighter, InputState
 from games.fighter.skeleton import POSES, blend, draw_fighter
 from games.fighter import sprites
@@ -332,8 +332,12 @@ class Projectile:
 
 # ============================================================================ dövüş sahnesi
 class FightScene(Scene):
-    def __init__(self, app, c1, c2, stage_i, two_player):
+    def __init__(self, app, c1, c2, stage_i, two_player, net=None):
         super().__init__(app)
+        self.net = net
+        self.local = net.side if net else 0
+        self.net_menu = False
+        self.acc = 0.0
         self.c = (c1, c2)
         self.two = two_player
         self.stage = STAGES[stage_i]()
@@ -362,8 +366,11 @@ class FightScene(Scene):
         if app.touch_mode:
             from engine.touch import TouchPad
             self.touch = TouchPad()
-            self.touch.set_skill_labels(CHARACTERS[c1])
-        if two_player:
+            self.touch.set_skill_labels(CHARACTERS[(c1, c2)[self.local]])
+        if net:
+            ctrl1, ctrl2 = NetController(), NetController()
+            self.local_reader = HumanController(KEYMAP_SOLO, joys[0] if joys else None, self.touch)
+        elif two_player:
             ctrl1 = HumanController(KEYMAPS[0], joys[0] if len(joys) > 0 else None, self.touch)
             ctrl2 = HumanController(KEYMAPS[1], joys[1] if len(joys) > 1 else None)
         else:
@@ -416,6 +423,9 @@ class FightScene(Scene):
         return None
 
     def handle(self, e):
+        if self.net:
+            self.net_handle(e)
+            return
         if self.touch is not None and not self.paused and not self.match_over:
             if self.touch.handle(e):
                 if self.touch.take("PAUSE"):
@@ -497,8 +507,107 @@ class FightScene(Scene):
                 self.match_choice = 1 - self.match_choice
                 self.app.audio.play("menu")
 
+    # ------------------------------------------------------------------ ağ oyunu
+    def net_handle(self, e):
+        if self.touch is not None and not self.match_over and not self.net_menu:
+            if self.touch.handle(e):
+                if self.touch.take("PAUSE"):
+                    self.net_menu = True
+                return
+        esc = (e.type == pygame.KEYDOWN and e.key in (pygame.K_ESCAPE, pygame.K_AC_BACK)) or \
+            (e.type == pygame.JOYBUTTONDOWN and e.button in (7, 9))
+        tap = self._tap(e)
+        if self.net.disconnected:
+            if esc or is_confirm(e) or tap:
+                self.app.audio.stop_music()
+                self.app.pop()
+            return
+        if self.net_menu:
+            if esc:
+                self.net_menu = False
+            elif is_confirm(e) or tap:
+                self.net.conn.send({"t": "bye"})
+                self.app.audio.stop_music()
+                self.app.pop()
+            return
+        if esc:
+            self.net_menu = True
+            return
+        if e.type == pygame.KEYDOWN and e.key == pygame.K_TAB:
+            self.show_skills = not self.show_skills
+            return
+        if self.match_over and self.local == 0:
+            if tap:
+                for i in range(2):
+                    if pygame.Rect(W // 2 - 160, 380 + i * 70, 320, 54).collidepoint(tap):
+                        self.match_choice = i
+                        e = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN)
+            d = nav_dir(e)
+            if d and d[1]:
+                self.match_choice = 1 - self.match_choice
+                self.app.audio.play("menu")
+            elif (is_confirm(e) or (e.type == pygame.KEYDOWN and e.key in (pygame.K_f, pygame.K_k))) and self.phase_t > 1.5:
+                choice = "rematch" if self.match_choice == 0 else "leave"
+                self.net.conn.send({"t": "menu", "c": choice})
+                self.net_choice(choice)
+
+    def net_choice(self, choice):
+        if choice == "rematch":
+            self.net = self.net.restart()
+            self.acc = 0.0
+            for f in self.f:
+                f.wins = 0
+                f.meter = 0
+            self.round = 1
+            self.match_over = False
+            self.start_round()
+        else:
+            self.app.audio.stop_music()
+            self.app.pop()
+
+    def net_update(self, dt):
+        from engine.net import INPUT_DELAY
+        ls = self.net
+        ls.pump()
+        msgs, ls.remote_msgs = ls.remote_msgs, []
+        for m in msgs:
+            if m.get("t") == "bye":
+                ls.disconnected = True
+            elif m.get("t") == "menu" and self.local == 1:
+                self.net_choice(m["c"])
+                return
+        if ls.disconnected:
+            return
+        self.acc += min(dt, 1 / 20)
+        STEP = 1 / 60
+        steps = 0
+        while self.acc >= STEP and steps < 4:
+            if ls.frame + INPUT_DELAY > ls.sent_upto:
+                inp = self.local_reader.poll(self.f[self.local], self.f[1 - self.local], self)
+                if self.net_menu:
+                    inp = InputState()
+                ls.push_local([inp.left, inp.right, inp.up, inp.down, inp.p, inp.k, inp.p_held, inp.k_held, inp.special])
+            ls.pump()
+            if not ls.ready():
+                break
+            a, b = ls.take()
+            for f, v in zip(self.f, (a, b)):
+                f.ctrl.value = InputState(*v) if v else InputState()
+            self._update_core(STEP)
+            ls.checksum(round(sum(f.x + f.y + f.health for f in self.f), 2))
+            self.acc -= STEP
+            steps += 1
+        if self.acc > STEP * 4:
+            self.acc = STEP * 4
+
     # ------------------------------------------------------------------ güncelleme
     def update(self, dt):
+        if self.net:
+            self.net_update(dt)
+            return
+        self._update_core(dt)
+
+    def _update_core(self, dt):
         if self.paused:
             return
         self.t += dt
@@ -857,10 +966,33 @@ class FightScene(Scene):
             else:
                 text(s, p["msg"], p["size"], (p["x"] - camx, p["y"] - camy - (1 - k) * 30), p["color"], outline=3, alpha=a)
         if self.touch is not None and not self.paused and not self.match_over:
-            self.touch.draw(s, self.f[0], self.t)
+            self.touch.draw(s, self.f[self.local], self.t)
         self.draw_announcer(s)
+        if self.net:
+            self.draw_net_overlay(s)
         if self.paused:
             self.draw_pause(s)
+
+    def draw_net_overlay(self, s):
+        ls = self.net
+        text(s, "AĞ OYUNU  •  " + ("KURUCU (1P)" if self.local == 0 else "KATILAN (2P)"), 15, (W // 2, 104), (190, 210, 255))
+        if ls.disconnected:
+            ov = pygame.Surface((W, H), pygame.SRCALPHA)
+            ov.fill((5, 0, 15, 200))
+            s.blit(ov, (0, 0))
+            text(s, "BAĞLANTI KOPTU", 60, (W // 2, 300), (255, 90, 90), outline=4)
+            text(s, "Diğer oyuncu çıktı ya da ağ bağlantısı kesildi. ENTER: Menüye dön", 22, (W // 2, 370), WHITE)
+        elif self.net_menu:
+            ov = pygame.Surface((W, H), pygame.SRCALPHA)
+            ov.fill((5, 0, 15, 180))
+            s.blit(ov, (0, 0))
+            text(s, "Oyundan çıkılsın mı?", 50, (W // 2, 300), GOLD, outline=3)
+            text(s, "ENTER: Çık   •   ESC: Devam (oyun durmaz)", 22, (W // 2, 360), WHITE)
+        elif self.match_over and self.local == 1:
+            text(s, "Kurucunun seçimi bekleniyor...", 22, (W // 2, 530), (200, 190, 230), outline=2)
+        if ls.desynced() or getattr(self, "_desync", False):
+            self._desync = True
+            text(s, "Uyarı: iki ekran farklılaştı (senkron hatası)", 16, (W // 2, 124), (255, 120, 120))
 
     def draw_sparks(self, s, camx, camy):
         for x, y, life, col, strength in self.sparks:
@@ -933,7 +1065,7 @@ class FightScene(Scene):
                  anchor="midleft" if i == 0 else "midright")
         if self.show_skills and not getattr(self.app, "touch_mode", False):
             for i, f in enumerate(self.f):
-                if self.two or i == 0:
+                if self.two or i == self.local:
                     self.draw_skill_panel(s, f, i)
         # zaman
         tr = pygame.Rect(W // 2 - 48, 20, 96, 70)
@@ -1015,7 +1147,7 @@ class FightScene(Scene):
             else:
                 w = self.f[self.match_winner]
                 if not self.two:
-                    msg = "KAZANDIN!" if self.match_winner == 0 else "KAYBETTİN"
+                    msg = "KAZANDIN!" if self.match_winner == self.local else "KAYBETTİN"
                 else:
                     msg = f"{self.match_winner + 1}. OYUNCU KAZANDI!"
                 text(s, f"{w.ch['name']}", 40, (W // 2, 190), shade(w.ch["fx"], 1.2), outline=3)

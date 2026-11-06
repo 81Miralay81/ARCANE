@@ -17,6 +17,7 @@ class MainMenu(Scene):
         self.stars = [(random.uniform(0, W), random.uniform(0, H * 0.6), random.random()) for _ in range(120)]
         self.items = [
             ("GÖLGE SEFERİ", "Hack and slash macerası — seviye atla, yetenek geliştir", self.hack),
+            ("AĞDA OYNA (LAN)", "Aynı ağdaki arkadaşınla: dövüş, birlikte macera, pong", self.lan),
             ("DÖVÜŞ ARENASI", "1 Oyuncu — bilgisayara karşı", self.fight_1p),
             ("DÖVÜŞ ARENASI  2P", "2 Oyuncu — aynı klavyede", self.fight_2p),
             ("NEON YILAN", "Klasik yılan oyunu", lambda: self.open("snake")),
@@ -29,6 +30,10 @@ class MainMenu(Scene):
 
     def on_enter(self):
         self.app.audio.play_music("menu")
+
+    def lan(self):
+        from engine.lan import LanLobby
+        self.app.push(LanLobby(self.app))
 
     def hack(self):
         from games.hack.camp import HackSelect
@@ -91,7 +96,7 @@ class MainMenu(Scene):
         self.t += dt
 
     def item_rect(self, idx):
-        return pygame.Rect(W // 2 + 40, 140 + idx * 58, 520, 50)
+        return pygame.Rect(W // 2 + 40, 132 + idx * 54, 520, 46)
 
     def draw(self, s):
         s.blit(self.bg, (0, 0))

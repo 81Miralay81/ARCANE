@@ -7,7 +7,7 @@ import pygame
 from engine.core import (GOLD, WHITE, W, H, Particles, Scene, blit_glow, is_back, is_confirm, lerp_color, nav_dir,
                          resource_path, shade, text)
 from games.hack import data as D
-from games.hack.entities import (FLOOR_Y0, ZMAX, Effect, Enemy, Hazard, Hero, Projectile)
+from games.hack.entities import (FLOOR_Y0, RNG, ZMAX, Effect, Enemy, Hazard, Hero, Projectile)
 
 KEYS = dict(
     left=(pygame.K_LEFT, pygame.K_a), right=(pygame.K_RIGHT, pygame.K_d), up=(pygame.K_UP, pygame.K_w),
@@ -43,10 +43,8 @@ class HackTouch:
             Button("skill3", 1225, 395, 50, sk[3]["name"], (255, 210, 60)),
             Button("potion", 1225, 150, 32, "İKSİR", (120, 230, 140)),
         ]
-
     def handle(self, e):
         return self.pad.handle(e)
-
     def read(self):
         p = self.pad
         out = {k: p.take(k) for k in ("attack", "heavy", "jump", "dodge", "potion", "skill0", "skill1", "skill2",
@@ -118,15 +116,28 @@ def draw_cooldown(s, x, y, r, hero, i):
 
 
 class HackLevel(Scene):
-    def __init__(self, app, hid, profile, chapter_i):
+    def __init__(self, app, hid, profile, chapter_i, net=None, heroes=None, seed=None):
+        """heroes: [(hid, profile), ...] ağ oyununda iki kahraman (0 = kurucu). net: Lockstep."""
         super().__init__(app)
-        self.hid = hid
-        self.profile = profile
+        from games.hack import entities
+        entities.seed(seed if seed is not None else random.randrange(1 << 30))
+        self.net = net
+        self.local = net.side if net else 0
+        specs = heroes or [(hid, profile)]
+        self.hid = specs[self.local][0]
+        self.profile = specs[self.local][1]
+        self.specs = specs
         self.ch = D.CHAPTERS[chapter_i]
         self.chapter_i = chapter_i
-        nm = 1.9 if profile.get("nightmare") else 1.0
-        self.mult = (1 + 0.55 * chapter_i) * nm
-        self.hero = Hero(hid, D.HEROES[hid], profile, 220, ZMAX * 0.6)
+        nm = 1.9 if specs[0][1].get("nightmare") else 1.0
+        coop = 1.0 + 0.6 * (len(specs) - 1)
+        self.mult = (1 + 0.55 * chapter_i) * nm * coop
+        self.heroes = []
+        for n, (h_id, prof) in enumerate(specs):
+            hero = Hero(h_id, D.HEROES[h_id], prof, 220 - n * 70, ZMAX * (0.6 - 0.35 * n))
+            hero.index = n
+            self.heroes.append(hero)
+        self.hero = self.heroes[self.local]
         self.enemies = []
         self.projectiles = []
         self.hazards = []
@@ -144,6 +155,7 @@ class HackLevel(Scene):
         self.locked = None
         self.wave_spawned = False
         self.state = "play"       # play / pause / dead / victory
+        self.menu_open = False    # ağ oyununda ESC menüsü (oyun durmaz)
         self.menu_i = 0
         self.combo = 0
         self.combo_t = 0.0
@@ -159,7 +171,10 @@ class HackLevel(Scene):
         self.end_t = 0.0
         self.level_ups = 0
         self.held_prev = set()
-        self.touch = HackTouch(D.HEROES[hid]) if app.touch_mode else None
+        self.acc = 0.0
+        self.net_msg = ""
+        self.desync = False
+        self.touch = HackTouch(D.HEROES[self.hid]) if app.touch_mode else None
         img = pygame.image.load(resource_path("assets", "stages", self.ch["stage"])).convert()
         h = H + 40
         w = int(img.get_width() * h / img.get_height())
@@ -168,7 +183,7 @@ class HackLevel(Scene):
         self.weather = [[random.uniform(0, W), random.uniform(0, H), random.uniform(0.3, 1)] for _ in range(80)]
         self.vignette = self._vignette()
         from games.fighter import sprites
-        for cid in {hid, "jax", "daiki", "kaito", "titus"}:
+        for cid in {h_id for h_id, _ in specs} | {"jax", "daiki", "kaito", "titus"}:
             sprites.get(cid).preload()
 
     def on_enter(self):
@@ -224,15 +239,21 @@ class HackLevel(Scene):
             m = {0: "attack", 2: "attack", 1: "heavy", 3: "jump", 4: "skill0", 5: "skill1", 6: "skill2", 7: "skill3"}
             if e.button in m:
                 self._joy = m[e.button]
-        if self.state == "play":
+        esc = (e.type == pygame.KEYDOWN and e.key in (pygame.K_ESCAPE, pygame.K_AC_BACK)) or \
+            (e.type == pygame.JOYBUTTONDOWN and e.button in (9,))
+        if self.state == "play" and not self.menu_open:
             if self.touch and self.touch.handle(e):
                 return
-            if (e.type == pygame.KEYDOWN and e.key in (pygame.K_ESCAPE, pygame.K_AC_BACK)) or \
-                    (e.type == pygame.JOYBUTTONDOWN and e.button in (9,)):
-                self.state = "pause"
+            if esc:
+                if self.net:
+                    self.menu_open = True
+                else:
+                    self.state = "pause"
                 self.menu_i = 0
                 self.app.audio.play("back")
             return
+        if self.net and self.local == 1 and self.state in ("dead", "victory") and not self.net.disconnected:
+            return   # seçimi kurucu yapar
         tap = e.pos if (e.type == pygame.MOUSEBUTTONDOWN and e.button == 1) else None
         opts = self.menu_options()
         if tap:
@@ -247,25 +268,40 @@ class HackLevel(Scene):
         if d and d[1]:
             self.menu_i = (self.menu_i + d[1]) % len(opts)
             self.app.audio.play("menu")
-        elif is_confirm(e) and (self.state == "pause" or self.end_t > 1.2):
+        elif is_confirm(e) and (self.state == "pause" or self.menu_open or self.end_t > 1.2):
             self.app.audio.play("select")
-            choice = opts[self.menu_i]
-            if choice == "Devam Et":
-                self.state = "play"
-            elif choice == "Tekrar Dene":
-                self.finish(False)
-                self.app.replace(HackLevel(self.app, self.hid, self.profile, self.chapter_i))
-            elif choice == "Sonraki Bölüm":
-                self.finish(True)
-                self.app.replace(HackLevel(self.app, self.hid, self.profile, min(self.chapter_i + 1, len(D.CHAPTERS) - 1)))
+            self.choose(opts[self.menu_i], send=True)
+        elif is_back(e) and (self.state == "pause" or self.menu_open):
+            self.state = "play" if self.state == "pause" else self.state
+            self.menu_open = False
+
+    def choose(self, choice, send=False):
+        if self.net and send and choice in ("Tekrar Dene", "Sonraki Bölüm", "Kampa Dön", "Oyundan Çık"):
+            self.net.conn.send({"t": "menu", "c": choice})
+        if choice == "Devam Et":
+            self.state = "play" if self.state == "pause" else self.state
+            self.menu_open = False
+        elif choice in ("Tekrar Dene", "Sonraki Bölüm"):
+            won = choice == "Sonraki Bölüm"
+            self.finish(won)
+            nxt = self.chapter_i if not won else min(self.chapter_i + 1, len(D.CHAPTERS) - 1)
+            if self.net:
+                self.app.replace(HackLevel(self.app, self.hid, self.profile, nxt, net=self.net.restart(),
+                                           heroes=self.specs, seed=self.net.seed + self.net.round))
             else:
-                if self.state != "pause":
-                    self.finish(self.state == "victory")
-                self.app.pop()
-        elif is_back(e) and self.state == "pause":
-            self.state = "play"
+                self.app.replace(HackLevel(self.app, self.hid, self.profile, nxt))
+        else:
+            if self.state in ("dead", "victory"):
+                self.finish(self.state == "victory")
+            if self.net and choice == "Oyundan Çık":
+                self.net.conn.send({"t": "bye"})
+            self.app.pop()
 
     def menu_options(self):
+        if self.net and self.net.disconnected:
+            return ["Kampa Dön"]
+        if self.menu_open:
+            return ["Devam Et", "Oyundan Çık"]
         if self.state == "pause":
             return ["Devam Et", "Kampa Dön"]
         if self.state == "dead":
@@ -285,6 +321,9 @@ class HackLevel(Scene):
                 p["cleared"].append(self.chapter_i)
             p["chapter"] = max(p["chapter"], min(len(D.CHAPTERS), self.chapter_i + 2))
         p["potions"] = max(p["potions"], 2) if not won else max(self.hero.potions, 2)
+        if self.net and self.local == 1:
+            # katılan: profil kendi kaydına işlenir
+            self.app.save.data.setdefault("hack", {})[self.hid] = p
         p["best_combo"] = max(p.get("best_combo", 0), self.max_combo)
         p["kills"] = p.get("kills", 0) + self.kills
         self.app.save.save()
@@ -294,10 +333,10 @@ class HackLevel(Scene):
         return i * W
 
     def update_sections(self):
-        h = self.hero
+        lead = max(h.x for h in self.heroes)
         if self.locked is None:
             nxt = self.section + 1
-            if nxt < self.sections and h.x > self.section_left(nxt) + W * 0.42:
+            if nxt < self.sections and lead > self.section_left(nxt) + W * 0.42:
                 self.section = nxt
                 self.locked = self.section_left(nxt)
                 self.spawn_section(nxt)
@@ -311,18 +350,37 @@ class HackLevel(Scene):
                     self.locked = None
                     self.go_t = 3.0
                     self.app.audio.play("round")
+                    # birlikte oyunda düşen arkadaş dirilir
+                    for h in self.heroes:
+                        if h.dead:
+                            self.revive(h)
+
+    def revive(self, h):
+        h.dead = False
+        h.hp = h.maxhp * 0.4
+        h.set_state("getup")
+        h.invuln = 1.5
+        h.fade = 1.0
+        self.popup_text(h.x, h.z, h.height + 40, "DİRİLDİ!", (120, 255, 140), 28)
+        self.effects.append(Effect("pillar", 0.8, x=h.x, z=h.z, height=360, color=(120, 255, 140)))
+
+    def target_for(self, e):
+        alive = [h for h in self.heroes if not h.dead]
+        if not alive:
+            return None
+        return min(alive, key=lambda h: abs(h.x - e.x) + abs(h.z - e.z) * 2)
 
     def spawn_section(self, i):
         waves = self.ch["waves"]
         if i < len(waves):
             kinds = list(waves[i])
             if self.profile.get("nightmare"):
-                kinds += random.sample(kinds, min(2, len(kinds)))
+                kinds += RNG.sample(kinds, min(2, len(kinds)))
             for n, k in enumerate(kinds):
                 side = 1 if n % 2 == 0 else -1
                 x = self.locked + (W + 60 + n * 50 if side > 0 else -60 - n * 50)
-                elite = random.random() < 0.12 + 0.05 * self.chapter_i
-                e = Enemy(k, D.ENEMIES[k], x, random.uniform(10, ZMAX - 10), self.mult, elite=elite)
+                elite = RNG.random() < 0.12 + 0.05 * self.chapter_i
+                e = Enemy(k, D.ENEMIES[k], x, RNG.uniform(10, ZMAX - 10), self.mult, elite=elite)
                 e.cd = 0.8 + n * 0.35
                 self.enemies.append(e)
         else:
@@ -357,22 +415,25 @@ class HackLevel(Scene):
         return best
 
     # ------------------------------------------------------------------ savaş
-    def damage_enemy(self, e, mult, kind, src_x, heavy_fx=False):
-        dmg, crit = self.hero.roll_dmg(mult)
+    def damage_enemy(self, e, mult, kind, src_x, hero=None):
+        hero = hero or self.hero
+        dmg, crit = hero.roll_dmg(mult)
         got = e.hurt(dmg, src_x, kind, self, crit)
         if not got:
             return False
-        self.hero.energy = min(self.hero.max_energy, self.hero.energy + 2.2)
+        hero.energy = min(hero.max_energy, hero.energy + 2.2)
         self.combo += 1
         self.combo_t = 2.6
         self.max_combo = max(self.max_combo, self.combo)
         col = (255, 230, 90) if crit else WHITE
+        if len(self.heroes) > 1 and hero is not self.hero:
+            col = (190, 220, 255) if not crit else (255, 210, 120)
         self.popup_text(e.x + random.uniform(-20, 20), e.z, e.height * 0.9, ("KRİTİK " if crit else "") + str(dmg), col,
                         30 if crit else 22)
         hx = e.x
         hy = FLOOR_Y0 + e.z - e.y - e.height * 0.55
-        self.parts.emit(hx, hy, 10 if crit else 6, self.hero.color, speed=6, life=18, size=4, glow=True)
-        self.effects.append(Effect("ring", 0.18, x=e.x, z=e.z, radius=40, color=self.hero.color))
+        self.parts.emit(hx, hy, 10 if crit else 6, hero.color, speed=6, life=18, size=4, glow=True)
+        self.effects.append(Effect("ring", 0.18, x=e.x, z=e.z, radius=40, color=hero.color))
         self.hitstop = max(self.hitstop, 0.06 if crit or kind != "light" else 0.035)
         self.shake = max(self.shake, 5 if crit else 3)
         self.app.audio.play("hit_h" if kind != "light" or crit else "hit_l", 0.8)
@@ -388,7 +449,7 @@ class HackLevel(Scene):
                 continue
             if abs(e.y - hero.y) > 160:
                 continue
-            if self.damage_enemy(e, mult, kind, hero.x):
+            if self.damage_enemy(e, mult, kind, hero.x, hero):
                 hit_ids.add(e.uid)
 
     def aoe(self, hero, x, z, radius, mult, kind):
@@ -396,16 +457,15 @@ class HackLevel(Scene):
             if e.dead:
                 continue
             if math.hypot(e.x - x, (e.z - z) * 2.2) < radius:
-                self.damage_enemy(e, mult, kind, x)
+                self.damage_enemy(e, mult, kind, x, hero)
 
-    def hurt_hero(self, dmg, src_x, kind="light"):
-        h = self.hero
+    def hurt_hero(self, h, dmg, src_x, kind="light"):
         if h.dead or h.invuln > 0 or h.state == "dodge":
             return False
         if h.state == "skill" and h.cast and h.cast["sk"].get("armor"):
             dmg *= 0.4
             kind = "none"
-        dmg = int(dmg * random.uniform(0.9, 1.1))
+        dmg = int(dmg * RNG.uniform(0.9, 1.1))
         if kind == "none":
             h.hp -= dmg
             h.flash = 0.1
@@ -414,14 +474,17 @@ class HackLevel(Scene):
             if h.state != "dying":
                 h.invuln = 0.45 if kind == "light" else 0.9
         self.popup_text(h.x, h.z, h.height * 0.9, str(dmg), (255, 80, 80), 24)
-        self.combo = 0
+        if h is self.hero:
+            self.combo = 0
         self.shake = max(self.shake, 7)
         self.app.audio.play("hit_h")
         if h.hp <= 0 and not h.dead:
             h.dead = True
             h.hp = 0
             h.set_state("dying")
-        if h.dead and self.state == "play":
+            if len(self.heroes) > 1:
+                self.popup_text(h.x, h.z, h.height + 40, "DÜŞTÜ! Dalgayı bitirin, dirilecek", (255, 120, 120), 22)
+        if all(x.dead for x in self.heroes) and self.state == "play":
             self.state = "dead"
             self.end_t = 0
             self.menu_i = 0
@@ -429,15 +492,16 @@ class HackLevel(Scene):
         return True
 
     def enemy_melee(self, e, x1, x2, zr, atk, hit_ids):
-        h = self.hero
-        if h.uid in hit_ids:
-            return
         lo, hi = min(x1, x2), max(x1, x2)
-        l, r = h.body_rect()
-        if r < lo or l > hi or abs(e.z - h.z) > zr or h.y > 120:
-            return
-        hit_ids.add(h.uid)
-        self.hurt_hero(atk, e.x, "knock" if e.data["ai"] == "brute" or e.boss and random.random() < 0.3 else "light")
+        for h in self.heroes:
+            if h.uid in hit_ids or h.dead:
+                continue
+            l, r = h.body_rect()
+            if r < lo or l > hi or abs(e.z - h.z) > zr or h.y > 120:
+                continue
+            hit_ids.add(h.uid)
+            heavy = e.data["ai"] == "brute" or (e.boss and RNG.random() < 0.3)
+            self.hurt_hero(h, atk, e.x, "knock" if heavy else "light")
 
     def enemy_slam(self, e):
         r = 150 if not e.boss else 210
@@ -445,7 +509,7 @@ class HackLevel(Scene):
                                    e.aura or (220, 180, 120), owner=e))
 
     def spawn_enemy_projectile(self, e, move):
-        h = self.hero
+        h = self.target_for(e) or self.hero
         y = e.height * 0.55
         if move == "blades":
             for a in (-0.3, -0.15, 0, 0.15, 0.3):
@@ -462,16 +526,16 @@ class HackLevel(Scene):
         self.app.audio.play("fireball", 0.6)
 
     def boss_meteors(self, e):
-        h = self.hero
+        h = self.target_for(e) or self.hero
         for i in range(6 + (3 if e.phase2 else 0)):
-            x = h.x + random.uniform(-260, 260)
-            z = max(0, min(ZMAX, h.z + random.uniform(-70, 70)))
+            x = h.x + RNG.uniform(-260, 260)
+            z = max(0, min(ZMAX, h.z + RNG.uniform(-70, 70)))
             self.hazards.append(Hazard("enemy", x, z, 95, 0.9 + i * 0.18, e.atk * 1.3, "knock", "meteor",
                                        (255, 90, 40), owner=e))
 
     def boss_summon(self, e):
         for k in range(2):
-            m = Enemy("haydut", D.ENEMIES["haydut"], e.x + random.choice((-1, 1)) * 260, random.uniform(10, ZMAX - 10),
+            m = Enemy("haydut", D.ENEMIES["haydut"], e.x + RNG.choice((-1, 1)) * 260, RNG.uniform(10, ZMAX - 10),
                       self.mult)
             self.enemies.append(m)
             self.fx_burst(m.x, m.z, 90, (160, 80, 255))
@@ -479,15 +543,15 @@ class HackLevel(Scene):
 
     def hazard_hit(self, hz):
         if hz.team == "enemy":
-            h = self.hero
-            if math.hypot(h.x - hz.x, (h.z - hz.z) * 2.2) < hz.radius and h.y < 120:
-                self.hurt_hero(hz.dmg, hz.x, hz.kind)
+            for h in self.heroes:
+                if math.hypot(h.x - hz.x, (h.z - hz.z) * 2.2) < hz.radius and h.y < 120:
+                    self.hurt_hero(h, hz.dmg, hz.x, hz.kind)
             self.shake = max(self.shake, 8)
             self.app.audio.play("boom", 0.7)
             self.parts.emit(hz.x, FLOOR_Y0 + hz.z, 18, hz.color, speed=7, life=26, size=6, gravity=0.3,
                             angle=-math.pi / 2, spread=2.4)
         else:
-            self.aoe(self.hero, hz.x, hz.z, hz.radius, hz.dmg, hz.kind)
+            self.aoe(hz.owner or self.hero, hz.x, hz.z, hz.radius, hz.dmg, hz.kind)
             self.shake = max(self.shake, 9)
             self.app.audio.play("boom", 0.6)
             self.parts.emit(hz.x, FLOOR_Y0 + hz.z, 16, hz.color, speed=7, life=26, size=6, gravity=0.3,
@@ -501,7 +565,7 @@ class HackLevel(Scene):
             p = Projectile("hero", hero.x + hero.facing * 60, hero.z, hero.height * 0.55 if not sk.get("ground") else 0,
                            hero.facing * sk["speed"], a * 10, sk["radius"], mult, sk["style"], hero.color,
                            pierce=sk.get("pierce", False), explode=sk.get("explode", 0), life=1.8,
-                           kind="knock" if sk.get("ground") else "heavy", ground=sk.get("ground", False))
+                           kind="knock" if sk.get("ground") else "heavy", ground=sk.get("ground", False), owner=hero)
             self.projectiles.append(p)
         self.app.audio.play("fireball")
 
@@ -520,10 +584,11 @@ class HackLevel(Scene):
         elif typ == "meteors":
             targets = [e for e in self.enemies if not e.dead] or [hero]
             for i in range(sk["hits"]):
-                tg = random.choice(targets)
-                x = tg.x + random.uniform(-90, 90)
-                z = max(0, min(ZMAX, tg.z + random.uniform(-40, 40)))
-                self.hazards.append(Hazard("hero", x, z, 110, 0.4 + i * 0.1, mult, "knock", "meteor", (255, 100, 40)))
+                tg = RNG.choice(targets)
+                x = tg.x + RNG.uniform(-90, 90)
+                z = max(0, min(ZMAX, tg.z + RNG.uniform(-40, 40)))
+                self.hazards.append(Hazard("hero", x, z, 110, 0.4 + i * 0.1, mult, "knock", "meteor", (255, 100, 40),
+                                          owner=hero))
             self.effects.append(Effect("flash", 0.5, color=(255, 60, 30), alpha=110))
             self.ult["done"] = True
         elif typ == "pillars":
@@ -532,7 +597,7 @@ class HackLevel(Scene):
                 for dz in (-60, 0, 60):
                     z = max(0, min(ZMAX, hero.z + dz))
                     self.hazards.append(Hazard("hero", x, z, 80, 0.15 + i * 0.09, mult * 0.5, "launch", "rock",
-                                               (220, 180, 90)))
+                                               (220, 180, 90), owner=hero))
             self.ult["done"] = True
 
     def update_ultimate(self, dt):
@@ -547,7 +612,8 @@ class HackLevel(Scene):
                 u["done_hits"] += 1
                 for e in self.enemies:
                     if not e.dead and abs(e.x - self.camx - W / 2) < W / 2 + 40:
-                        self.damage_enemy(e, u["mult"], "launch" if u["done_hits"] == u["hits"] else "light", hero.x)
+                        self.damage_enemy(e, u["mult"], "launch" if u["done_hits"] == u["hits"] else "light", hero.x,
+                                          hero)
             if u["done_hits"] >= u["hits"]:
                 self.finish_ult()
         elif u["type"] == "flurry":
@@ -557,13 +623,13 @@ class HackLevel(Scene):
                 if not targets or u["done_hits"] >= u["hits"]:
                     self.finish_ult()
                     return
-                tg = random.choice(targets)
-                side = random.choice((-1, 1))
+                tg = RNG.choice(targets)
+                side = RNG.choice((-1, 1))
                 hero.afterimages.append([hero.x, hero.z, hero.y, hero.frame(), hero.facing, 0.35])
                 hero.x = tg.x + side * 70
                 hero.z = tg.z
                 hero.facing = -side
-                self.damage_enemy(tg, u["mult"], "launch" if u["done_hits"] >= u["hits"] - 2 else "light", hero.x)
+                self.damage_enemy(tg, u["mult"], "launch" if u["done_hits"] >= u["hits"] - 2 else "light", hero.x, hero)
                 self.effects.append(Effect("slash", 0.15, owner=hero, radius=140, tilt=random.uniform(-1, 1),
                                            color=hero.color))
                 u["done_hits"] += 1
@@ -585,12 +651,12 @@ class HackLevel(Scene):
                         gravity=-0.06, glow=True)
         n = max(1, e.gold // 6)
         for i in range(min(n, 12)):
-            self.pickups.append(dict(kind="gold", x=e.x, z=e.z, y=40, vx=random.uniform(-4, 4), vy=random.uniform(6, 11),
+            self.pickups.append(dict(kind="gold", x=e.x, z=e.z, y=40, vx=RNG.uniform(-4, 4), vy=RNG.uniform(6, 11),
                                      val=max(1, e.gold // n), t=0.0))
         for i in range(min(6, max(2, e.xp // 10))):
-            self.pickups.append(dict(kind="xp", x=e.x, z=e.z, y=60, vx=random.uniform(-3, 3), vy=random.uniform(5, 9),
+            self.pickups.append(dict(kind="xp", x=e.x, z=e.z, y=60, vx=RNG.uniform(-3, 3), vy=RNG.uniform(5, 9),
                                      val=max(1, e.xp // max(2, min(6, e.xp // 10))), t=0.0))
-        if random.random() < (0.12 if not e.elite else 0.6) or e.boss:
+        if RNG.random() < (0.12 if not e.elite else 0.6) or e.boss:
             self.pickups.append(dict(kind="heal", x=e.x, z=e.z, y=50, vx=0, vy=8, val=0.15, t=0.0))
         if e.boss:
             self.effects.append(Effect("flash", 0.8, color=(255, 255, 255), alpha=200))
@@ -598,31 +664,33 @@ class HackLevel(Scene):
             self.app.audio.play("ko")
 
     def gain_xp(self, v):
-        p = self.profile
-        p["xp"] += v
-        self.xp_gain += v
-        while p["xp"] >= D.xp_needed(p["level"]):
-            p["xp"] -= D.xp_needed(p["level"])
-            p["level"] += 1
-            p["skill_pts"] += 1
-            self.level_ups += 1
-            h = self.hero
-            # yeni seviyede açılan yetenekler
-            for i, sk in enumerate(h.data["skills"]):
-                if p["skills"][i] == 0 and p["level"] >= sk["unlock"]:
-                    p["skills"][i] = 1
-                    self.popup_text(h.x, h.z, h.height + 90, f"YENİ YETENEK: {sk['name'].upper()}", GOLD, 26)
-            old_hp_ratio = h.hp / h.maxhp
-            nh = Hero(self.hid, h.data, p, h.x, h.z)
-            h.maxhp, h.atk = nh.maxhp, nh.atk
-            h.hp = min(h.maxhp, h.maxhp * old_hp_ratio + h.maxhp * 0.3)
-            self.popup_text(h.x, h.z, h.height + 50, f"SEVİYE {p['level']}!", GOLD, 36)
-            self.effects.append(Effect("pillar", 0.9, x=h.x, z=h.z, height=420, color=(255, 210, 90)))
-            self.app.audio.play("powerup")
+        for h in self.heroes:
+            p = h.p
+            p["xp"] += v
+            if h is self.hero:
+                self.xp_gain += v
+            while p["xp"] >= D.xp_needed(p["level"]):
+                p["xp"] -= D.xp_needed(p["level"])
+                p["level"] += 1
+                p["skill_pts"] += 1
+                if h is self.hero:
+                    self.level_ups += 1
+                for i, sk in enumerate(h.data["skills"]):
+                    if p["skills"][i] == 0 and p["level"] >= sk["unlock"]:
+                        p["skills"][i] = 1
+                        self.popup_text(h.x, h.z, h.height + 90, f"YENİ YETENEK: {sk['name'].upper()}", GOLD, 26)
+                old_hp_ratio = h.hp / h.maxhp
+                nh = Hero(h.cid, h.data, p, h.x, h.z)
+                h.maxhp, h.atk = nh.maxhp, nh.atk
+                if not h.dead:
+                    h.hp = min(h.maxhp, h.maxhp * old_hp_ratio + h.maxhp * 0.3)
+                self.popup_text(h.x, h.z, h.height + 50, f"SEVİYE {p['level']}!", GOLD, 36)
+                self.effects.append(Effect("pillar", 0.9, x=h.x, z=h.z, height=420, color=(255, 210, 90)))
+                self.app.audio.play("powerup")
 
     def update_pickups(self, dt):
-        h = self.hero
         k = dt * 60
+        alive = [h for h in self.heroes if not h.dead] or self.heroes
         for p in self.pickups:
             p["t"] += dt
             if p["t"] < 0.5:
@@ -633,6 +701,7 @@ class HackLevel(Scene):
                     p["vx"] *= 0.7
                     p["vy"] = abs(p["vy"]) * 0.4
             else:
+                h = min(alive, key=lambda q: abs(q.x - p["x"]) + abs(q.z - p["z"]))
                 dx, dz = h.x - p["x"], h.z - p["z"]
                 d = math.hypot(dx, dz)
                 sp = min(d, (8 + p["t"] * 14) * k)
@@ -643,7 +712,8 @@ class HackLevel(Scene):
                 if d < 30:
                     p["done"] = True
                     if p["kind"] == "gold":
-                        self.profile["gold"] += p["val"]
+                        for hh in self.heroes:      # ganimet paylaşılır
+                            hh.p["gold"] += p["val"]
                         self.gold_gain += p["val"]
                         self.app.audio.play("coin", 0.35)
                     elif p["kind"] == "xp":
@@ -658,7 +728,8 @@ class HackLevel(Scene):
         self.end_t = 0
         self.menu_i = 0
         bonus = int(self.max_combo * 3 + 60 * (self.chapter_i + 1))
-        self.profile["gold"] += bonus
+        for h in self.heroes:
+            h.p["gold"] += bonus
         self.gold_gain += bonus
         self.app.audio.play("win")
         self.finish(True)
@@ -692,19 +763,71 @@ class HackLevel(Scene):
     # ------------------------------------------------------------------ güncelleme
     def update(self, dt):
         dt = min(dt, 1 / 30)
+        if self.net:
+            self.net_update(dt)
+            return
         if self.state != "play":
             self.end_t += dt
             if self.state in ("dead", "victory"):
                 self.parts.update()
                 for ef in self.effects:
                     ef.update(dt)
-            if self.state == "dead":
-                self.hero.update(dt, self, 40, self.world_w - 40)
             return
         if self.touch is not None and self.touch.pad.take("PAUSE"):
             self.state = "pause"
             self.menu_i = 0
             return
+        inp = self.read_input()
+        self.sim_step(dt, [inp])
+
+    def net_update(self, dt):
+        from engine.net import INPUT_DELAY
+        ls = self.net
+        ls.pump()
+        for m in ls.remote_msgs:
+            if m.get("t") == "menu" and self.local == 1:
+                self.choose(m["c"])
+                ls.remote_msgs = []
+                return
+            if m.get("t") == "bye":
+                ls.disconnected = True
+        ls.remote_msgs = []
+        if ls.disconnected:
+            self.net_msg = "Bağlantı koptu"
+            if self.state == "play":
+                self.state = "dead"
+                self.end_t = 2
+            return
+        if self.touch is not None and self.touch.pad.take("PAUSE"):
+            self.menu_open = True
+        if self.state != "play":
+            self.end_t += dt
+            self.parts.update()
+            return
+        self.acc += dt
+        steps = 0
+        STEP = 1 / 60
+        while self.acc >= STEP and steps < 4:
+            if ls.frame + INPUT_DELAY > ls.sent_upto:
+                inp = self.read_input() if not self.menu_open else {"move": [0, 0]}
+                inp["move"] = list(inp.get("move", (0, 0)))
+                ls.push_local(inp)
+            ls.pump()
+            if not ls.ready():
+                break
+            a, b = ls.take()
+            self.sim_step(STEP, [a or {"move": [0, 0]}, b or {"move": [0, 0]}])
+            self.acc -= STEP
+            steps += 1
+            ls.checksum(round(sum(h.hp + h.x for h in self.heroes) + sum(e.hp + e.x for e in self.enemies), 1))
+            if ls.desynced():
+                self.desync = True
+            if self.state != "play":
+                break
+        if self.acc > STEP * 4:
+            self.acc = STEP * 4
+
+    def sim_step(self, dt, inputs):
         self.time += dt
         if self.banner and self.banner[1] > 0:
             self.banner = (self.banner[0], self.banner[1] - dt)
@@ -723,24 +846,26 @@ class HackLevel(Scene):
             if self.combo_t <= 0:
                 self.combo = 0
         self.go_t = max(0, self.go_t - dt)
-        inp = self.read_input()
-        if getattr(self, "_joy", None):
-            inp[self._joy] = True
+        if getattr(self, "_joy", None) and not self.net:
+            inputs[0][self._joy] = True
             self._joy = None
-        h = self.hero
-        if not self.ult or self.ult["type"] != "flurry":
-            h.control(inp, self, dt)
-        if self.locked is not None:
-            xmin, xmax = self.locked + 40, self.locked + W - 40
-        else:
-            xmin, xmax = max(40, self.camx + 40), self.world_w - 60
-        h.update(dt, self, xmin, xmax)
+        alive = [h for h in self.heroes if not h.dead]
+        for h, inp in zip(self.heroes, inputs):
+            if h.dead:
+                h.update(dt, self, 40, self.world_w - 40)
+                continue
+            if not self.ult or self.ult["type"] != "flurry" or self.ult["hero"] is not h:
+                h.control(inp, self, dt)
+            if self.locked is not None:
+                xmin, xmax = self.locked + 40, self.locked + W - 40
+            elif len(self.heroes) > 1:
+                xmin, xmax = max(40, self.camx + 40), min(self.world_w - 60, self.camx + W - 40)
+            else:
+                xmin, xmax = max(40, self.camx + 40), self.world_w - 60
+            h.update(dt, self, xmin, xmax)
         for e in self.enemies:
             if self.locked is not None:
                 exmin, exmax = self.locked - 300, self.locked + W + 300
-                if e.x < self.locked + 30 or e.x > self.locked + W - 30:
-                    if e.state in ("idle", "walk"):
-                        pass
             else:
                 exmin, exmax = -1000, self.world_w + 1000
             e.update(dt, self, exmin, exmax)
@@ -759,8 +884,12 @@ class HackLevel(Scene):
         self.update_pickups(dt)
         self.parts.update()
         self.update_sections()
-        # kamera
-        target = h.x - W * 0.42
+        # kamera (iki bilgisayarda aynı hesaplanır)
+        alive = [h for h in self.heroes if not h.dead] or self.heroes
+        if len(self.heroes) > 1:
+            target = sum(h.x for h in alive) / len(alive) - W / 2
+        else:
+            target = alive[0].x - W * 0.42
         if self.locked is not None:
             target = self.locked
         target = max(0, min(self.world_w - W, target))
@@ -770,6 +899,7 @@ class HackLevel(Scene):
 
     def projectile_hits(self, p):
         if p.team == "hero":
+            owner = p.owner or self.hero
             for e in self.enemies:
                 if e.dead or e.uid in p.hit_ids:
                     continue
@@ -778,24 +908,26 @@ class HackLevel(Scene):
                     continue
                 p.hit_ids.add(e.uid)
                 if p.explode:
-                    self.aoe(self.hero, p.x, p.z, p.explode, p.dmg, "knock")
+                    self.aoe(owner, p.x, p.z, p.explode, p.dmg, "knock")
                     self.fx_shockwave(p.x, p.z, p.explode, p.color, "fire")
                     self.app.audio.play("boom", 0.6)
                     p.dead = True
                     return
-                self.damage_enemy(e, p.dmg, p.kind, p.x - p.vx)
+                self.damage_enemy(e, p.dmg, p.kind, p.x - p.vx, owner)
                 if not p.pierce:
                     p.dead = True
                     return
         else:
-            h = self.hero
-            l, r = h.body_rect()
-            if p.x + p.radius < l or p.x - p.radius > r or abs(h.z - p.z) > 30 + p.radius * 0.4 or h.y > 140:
-                return
-            if self.hurt_hero(p.dmg, p.x - p.vx, "knock" if p.ground else "light"):
-                p.dead = True
+            for h in self.heroes:
+                if h.dead:
+                    continue
+                l, r = h.body_rect()
+                if p.x + p.radius < l or p.x - p.radius > r or abs(h.z - p.z) > 30 + p.radius * 0.4 or h.y > 140:
+                    continue
+                if self.hurt_hero(h, p.dmg, p.x - p.vx, "knock" if p.ground else "light"):
+                    p.dead = True
+                    return
 
-    # ------------------------------------------------------------------ çizim
     def draw_bg(self, s, camx):
         bw = self.bg.get_width()
         i0 = int(camx // bw)
@@ -835,7 +967,7 @@ class HackLevel(Scene):
         for hz in self.hazards:
             if not hz.done:
                 hz.draw(s, camx, self.time)
-        ents = [self.hero] + self.enemies
+        ents = self.heroes + self.enemies
         for e in ents:
             e.draw_shadow(s, camx)
         for p in self.pickups:
@@ -869,8 +1001,10 @@ class HackLevel(Scene):
             if ef.kind == "text":
                 ef.draw(s, camx, self.time)
         self.draw_hud(s)
-        if self.touch and self.state == "play":
+        if self.touch and self.state == "play" and not self.menu_open:
             self.touch.draw(s, self.hero)
+        if len(self.heroes) > 1:
+            self.draw_partner(s)
         if self.cinematic:
             self.draw_cinematic(s)
         self.draw_overlays(s)
@@ -1021,3 +1155,21 @@ class HackLevel(Scene):
             msg = f"{SKILL_KEYS[i]}  {sk['name']}  " + (f"Sv {lv}  •  {sk['cost']} enerji  •  {sk['cd']:.0f} sn"
                                                          if lv else f"(Seviye {sk['unlock']}'de açılır)")
             text(s, msg, 18, (W // 2, y + i * 26), WHITE if lv else (140, 130, 160))
+
+    def draw_partner(self, s):
+        other = self.heroes[1 - self.local]
+        x, y = 122, 132
+        pygame.draw.rect(s, (20, 12, 30), (x - 2, y - 2, 244, 30), border_radius=6)
+        text(s, f"{other.data['name']} (arkadaş)  Sv {other.p['level']}", 14, (x + 4, y + 6), shade(other.color, 1.2),
+             anchor="midleft", shadow=False)
+        pygame.draw.rect(s, (60, 20, 30), (x, y + 14, 240, 10), border_radius=4)
+        if not other.dead:
+            pygame.draw.rect(s, (230, 50, 70), (x, y + 14, int(240 * other.hp / other.maxhp), 10), border_radius=4)
+        else:
+            text(s, "DÜŞTÜ", 13, (x + 120, y + 19), (255, 120, 120), shadow=False)
+        # arkadaşın başının üstünde işaret
+        sx, sy = other.screen_pos(self.camx)
+        if not other.dead:
+            pygame.draw.polygon(s, other.color, [(sx - 9, sy - other.height - 26), (sx + 9, sy - other.height - 26),
+                                                (sx, sy - other.height - 12)])
+            text(s, "2P" if self.local == 0 else "1P", 14, (sx, sy - other.height - 38), other.color, outline=1)
