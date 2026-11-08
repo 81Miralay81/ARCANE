@@ -1,5 +1,12 @@
 # Sürüm Günlüğü
 
+## v1.3.4 (2026-11-08)
+**Neden:** Arcade'in "K" logosu diğer Kanatix uygulamalarının logosuna uymuyordu.
+
+- Yeni simge: Kanatix ortak logosu (turuncu kanatlar, koyu zemin) + sağ altta kırmızı oyun kolu rozeti; exe, APK ve açılış ekranı
+- Ana menüdeki logo da Kanatix kanat işaretiyle değişti
+- Simge üretici: marka/arcade.py (ortak marka/uret.py kullanılarak)
+
 ## v1.3.3 (2026-11-06)
 **Neden:** Telefon yeni sürümü görmüyordu (güncelleme ekranı çıkmıyordu).
 

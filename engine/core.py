@@ -6,7 +6,7 @@ import sys
 
 import pygame
 
-VERSION = "1.3.3"
+VERSION = "1.3.4"
 TITLE = "Kanatix Arcade"
 W, H = 1280, 720
 FPS = 60
@@ -252,20 +252,22 @@ def blit_glow(surf, pos, radius, color, intensity=1.0):
     surf.blit(g, (pos[0] - radius, pos[1] - radius), special_flags=pygame.BLEND_ADD)
 
 
+_logo_cache = {}
+
+
 def draw_kanatix_logo(surf, center, scale=1.0, t=0.0):
-    """Kanatix amblemi: kanat şeklinde K harfi."""
-    cx, cy = center
-    s = scale
-    wing = [(-40, -46), (-8, -46), (-8, -6), (34, -50), (64, -50), (14, 0), (64, 50), (34, 50), (-8, 6), (-8, 46), (-40, 46)]
-    pts = [(cx + x * s, cy + y * s) for x, y in wing]
-    blit_glow(surf, (int(cx), int(cy)), int(90 * s), (60, 30, 90), 0.8)
-    pygame.draw.polygon(surf, (255, 170, 40), pts)
-    # kanat tüyleri
-    for i in range(3):
-        off = (i * 12 + 18) * s
-        a = [(cx + 14 * s + off * 0.6, cy - 4 * s - off * 0.75), (cx + 64 * s, cy - (50 - i * 4) * s)]
-        pygame.draw.line(surf, (255, 230, 150), a[0], a[1], max(1, int(3 * s)))
-    pygame.draw.polygon(surf, (255, 240, 200), pts, max(1, int(3 * s)))
+    """Kanatix ortak logosu (kanat işareti, assets/logo_mark.png)."""
+    size = max(16, int(150 * scale))
+    img = _logo_cache.get(size)
+    if img is None:
+        try:
+            base = pygame.image.load(resource_path("assets", "logo_mark.png")).convert_alpha()
+            img = pygame.transform.smoothscale(base, (size, size))
+        except Exception:
+            img = pygame.Surface((size, size), pygame.SRCALPHA)
+        _logo_cache[size] = img
+    blit_glow(surf, (int(center[0]), int(center[1])), int(size * 0.62), (70, 34, 20), 0.9)
+    surf.blit(img, img.get_rect(center=(int(center[0]), int(center[1]))))
 
 
 class Scene:
