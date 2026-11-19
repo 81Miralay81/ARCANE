@@ -14,6 +14,8 @@ icon.filename = %(source.dir)s/assets/icon.png
 presplash.filename = %(source.dir)s/assets/icon.png
 android.presplash_color = #1a0a2e
 android.permissions = INTERNET
+# Android 11+: Kül ve Kanat yüklü mü diye bakabilmek için (paket görünürlüğü)
+android.extra_manifest_xml = ./android_queries.xml
 android.api = 34
 android.minapi = 24
 android.archs = arm64-v8a, armeabi-v7a

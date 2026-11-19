@@ -15,7 +15,12 @@ class MainMenu(Scene):
         self.i = 0
         self.bg = vgradient(W, H, (10, 6, 30), (60, 12, 50))
         self.stars = [(random.uniform(0, W), random.uniform(0, H * 0.6), random.random()) for _ in range(120)]
+        from engine import kulvekanat
+        self.kvk = kulvekanat
+        self.toast = ""
+        self.toast_t = 0.0
         self.items = [
+            ("KÜL VE KANAT  · YENİ", kulvekanat.alt_yazi, self.kul_ve_kanat),
             ("GÖLGE SEFERİ", "Hack and slash macerası — seviye atla, yetenek geliştir", self.hack),
             ("AĞDA OYNA (LAN)", "Aynı ağdaki arkadaşınla: dövüş, birlikte macera, pong", self.lan),
             ("DÖVÜŞ ARENASI", "1 Oyuncu — bilgisayara karşı", self.fight_1p),
@@ -30,6 +35,10 @@ class MainMenu(Scene):
 
     def on_enter(self):
         self.app.audio.play_music("menu")
+
+    def kul_ve_kanat(self):
+        self.toast = self.kvk.ac()
+        self.toast_t = 4.0
 
     def lan(self):
         from engine.lan import LanLobby
@@ -94,9 +103,10 @@ class MainMenu(Scene):
 
     def update(self, dt):
         self.t += dt
+        self.toast_t = max(0.0, self.toast_t - dt)
 
     def item_rect(self, idx):
-        return pygame.Rect(W // 2 + 40, 132 + idx * 54, 520, 46)
+        return pygame.Rect(W // 2 + 40, 126 + idx * 51, 520, 47)
 
     def draw(self, s):
         s.blit(self.bg, (0, 0))
@@ -130,6 +140,8 @@ class MainMenu(Scene):
         text(s, "A R C A D E", 34, (230, 145), (120, 220, 255), anchor="midleft", outline=2)
         # menü öğeleri
         for idx, (title, sub, _) in enumerate(self.items):
+            if callable(sub):
+                sub = sub()
             r = self.item_rect(idx)
             sel = idx == self.i
             if sel:
@@ -175,6 +187,10 @@ class MainMenu(Scene):
             pygame.draw.rect(s, GOLD, r, 3, border_radius=16)
             text(s, "GÜNCELLE", 36, r.center, WHITE)
             text(s, "Dokununca yeni APK indirilir; indirdikten sonra dosyayı açıp kur.", 18, (W // 2, 490), (190, 180, 220))
+        if self.toast_t > 0 and self.toast:
+            pygame.draw.rect(s, (40, 16, 8), (30, H - 100, 590, 42), border_radius=12)
+            pygame.draw.rect(s, (255, 150, 60), (30, H - 100, 590, 42), 2, border_radius=12)
+            text(s, self.toast, 20, (325, H - 79), (255, 225, 190))
         status = getattr(self.app, "update_status", None)
         if status:
             pygame.draw.rect(s, (20, 10, 40), (0, 0, W, 34))

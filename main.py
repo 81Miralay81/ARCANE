@@ -55,6 +55,8 @@ def main():
     try:
         from engine.updater import check_update_async
         check_update_async(app)
+        from engine import kulvekanat
+        kulvekanat.baslat()
     except Exception:
         traceback.print_exc()
     app.run(MainMenu(app))

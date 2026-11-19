@@ -1,5 +1,10 @@
 # Sürüm Günlüğü
 
+## v1.3.5 (2026-11-19)
+- Ana menüye **KÜL VE KANAT** eklendi. Bilgisayarda Arcade açılınca Kül ve Kanat arka planda indirilip kurulur, yeni sürümü çıkınca kendiliğinden güncellenir ve masaüstüne kısayol konur; menüden seçince açılır.
+- Telefonda Kül ve Kanat yüklüyse menüden doğrudan açılır, değilse APK indirmesi başlar (Yükle'ye basmak gerekir).
+- Neden: Yeni aksiyon RPG oyunu Kül ve Kanat ayrı bir uygulama (Godot motoru); Arcade'den tek yerden kurulup açılabilsin istendi.
+
 ## v1.3.4 (2026-11-08)
 **Neden:** Arcade'in "K" logosu diğer Kanatix uygulamalarının logosuna uymuyordu.
 
